@@ -10,7 +10,7 @@
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 10px; padding-bottom: 90px; }
         .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         
-        h2 { text-align: center; color: var(--primary); }
+        h2 { text-align: center; color: var(--primary); margin-top: 10px; }
         .header-info { background: #fff; padding: 15px; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 20px; }
         
         .seccion-titulo { background: var(--primary); color: white; padding: 12px; border-radius: 8px; margin-top: 30px; font-weight: bold; text-transform: uppercase; font-size: 0.9em; }
@@ -34,29 +34,33 @@
         #btn-finalizar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; background: var(--primary); color: white; border: none; padding: 18px; border-radius: 50px; font-size: 1.2em; font-weight: bold; cursor: pointer; box-shadow: 0 5px 20px rgba(0,0,0,0.3); z-index: 1000; }
         #btn-finalizar:disabled { background: #95a5a6; cursor: not-allowed; }
 
-        select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 1em; background: #fff; }
+        select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 1em; background: #fff; margin-top: 5px; }
+        .btn-regresar { display: inline-block; margin-bottom: 15px; background: #ecf0f1; color: #2c3e50; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.85em; border: 1px solid #ddd; }
     </style>
 </head>
 <body>
 
-<div style="max-width: 1000px; margin: auto; padding: 10px 0;">
-    <a href="index.html" style="background: #ecf0f1; color: #2c3e50; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.85em; border: 1px solid #ddd;">
-        ⬅ Salir de Configuración
-    </a>
-</div>
-    
 <div class="container">
+    <a href="index.html" class="btn-regresar">⬅ Volver al Inicio</a>
+    
     <h2>📋 Formulario de Auditoría</h2>
     
     <div class="header-info">
-        <label><strong>Seleccionar Bodega:</strong></label>
-        <select id="selectBodega">
-            <option value="">Cargando bodegas...</option>
-        </select>
+        <div style="margin-bottom: 15px;">
+            <label><strong>👤 ¿Quién realiza la evaluación?</strong></label>
+            <select id="selectAuditor">
+                <option value="">Cargando auditores...</option>
+            </select>
+        </div>
+        <div>
+            <label><strong>📦 Seleccionar Bodega:</strong></label>
+            <select id="selectBodega">
+                <option value="">Cargando bodegas...</option>
+            </select>
+        </div>
     </div>
 
-    <div id="renderArea">
-        </div>
+    <div id="renderArea"></div>
 </div>
 
 <button id="btn-finalizar" onclick="enviarEvaluacion()">💾 Guardar Evaluación</button>
@@ -69,14 +73,23 @@
     let preguntasGlobal = [];
 
     async function init() {
-        // 1. Cargar Bodegas con el nuevo formato
-        const { data: bodegas } = await _supabase.from('bodegas').select('*').order('localizacion');
-        const select = document.getElementById('selectBodega');
-        select.innerHTML = bodegas.map(b => `
-            <option value="${b.id}">${b.localizacion} | ${b.departamento} | ${b.nombre}</option>
-        `).join('');
+        // 1. Cargar Auditores
+        const { data: auditores } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
+        const selectA = document.getElementById('selectAuditor');
+        if(auditores.length > 0) {
+            selectA.innerHTML = '<option value="">Selecciona Auditor...</option>' + 
+                auditores.map(a => `<option value="${a.id}">${a.nombre}</option>`).join('');
+        } else {
+            selectA.innerHTML = '<option value="">No hay auditores registrados</option>';
+        }
 
-        // 2. Cargar Preguntas
+        // 2. Cargar Bodegas
+        const { data: bodegas } = await _supabase.from('bodegas').select('*').order('localizacion');
+        const selectB = document.getElementById('selectBodega');
+        selectB.innerHTML = '<option value="">Selecciona Bodega...</option>' + 
+            bodegas.map(b => `<option value="${b.id}">${b.localizacion} | ${b.departamento} | ${b.nombre}</option>`).join('');
+
+        // 3. Cargar Preguntas
         const { data: preguntas } = await _supabase.from('configuracion_preguntas').select('*').order('titulo', {ascending: true});
         preguntasGlobal = preguntas;
         renderizarAuditoria(preguntas);
@@ -98,7 +111,7 @@
 
             html += `
                 <div class="pregunta-card">
-                    <p style="margin-top:0;">${p.pregunta}</p>
+                    <p style="margin-top:0;"><strong>${p.pregunta}</strong></p>
                     <div class="opciones">
                         <div class="radio-btn">
                             <input type="radio" name="opt-${i}" id="c-${i}" class="check-c">
@@ -128,9 +141,15 @@
     }
 
     async function enviarEvaluacion() {
+        const auditorId = document.getElementById('selectAuditor').value;
         const bodegaId = document.getElementById('selectBodega').value;
         const btn = document.getElementById('btn-finalizar');
         
+        if (!auditorId || !bodegaId) {
+            alert("⚠️ Por favor, selecciona el Auditor y la Bodega.");
+            return;
+        }
+
         btn.innerText = "⏳ Procesando y Subiendo Fotos...";
         btn.disabled = true;
 
@@ -174,14 +193,18 @@
 
         const score = (pObt / pTot) * 100;
 
-        // Guardar Cabecera
+        // Guardar Cabecera incluyendo auditor_id
         const { data: evData, error: evErr } = await _supabase.from('evaluaciones').insert([{
-            bodega_id: bodegaId, calificacion_final: score.toFixed(2)
+            bodega_id: bodegaId, 
+            auditor_id: auditorId,
+            calificacion_final: score.toFixed(2)
         }]).select();
 
         if (evErr) {
+            console.error(evErr);
             alert("Error al conectar con la base de datos.");
-            btn.disabled = false; return;
+            btn.disabled = false; btn.innerText = "💾 Guardar Evaluación";
+            return;
         }
 
         // Guardar Detalles
