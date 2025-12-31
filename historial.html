@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Maestro de Auditorías</title>
+    <title>Dashboard Estratégico de Auditoría</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; --bg: #f4f7f6; }
@@ -11,7 +11,6 @@
         .container { max-width: 1250px; margin: auto; }
         
         .btn-regresar { display: inline-block; margin-bottom: 15px; background: #fff; color: var(--primary); padding: 8px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; border: 1px solid #ddd; transition: 0.3s; }
-        .btn-regresar:hover { background: #eee; }
 
         /* Filtros */
         .filter-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
@@ -24,26 +23,28 @@
         .action-plan { background: #fff4e5; border-left: 5px solid var(--warning); padding: 20px; border-radius: 12px; }
         .action-plan h3 { margin-top: 0; color: #856404; font-size: 1.1em; }
         
-        /* Resúmenes Gráficos */
+        /* Gráficos de Barras */
         .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px; }
-        .summary-card h4 { margin: 0 0 15px 0; border-bottom: 2px solid #f4f7f6; padding-bottom: 10px; }
-        
         .bar-container { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 0.85em; }
         .bar-label { width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .bar-bg { flex: 1; background: #eee; height: 10px; border-radius: 5px; overflow: hidden; }
         .bar-fill { height: 100%; transition: 0.8s ease-in-out; }
 
-        /* Tabla */
+        /* Tabla Principal */
         .table-container { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         table { width: 100%; border-collapse: collapse; }
         th { background: #f8f9fa; padding: 12px; font-size: 0.8em; text-align: left; color: #7f8c8d; text-transform: uppercase; }
         td { padding: 12px; border-bottom: 1px solid #eee; font-size: 0.9em; }
         tr:hover { background: #f1f8ff; cursor: pointer; }
 
-        /* Modal */
+        /* Modal y Detalle Unificado */
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); }
-        .modal-content { background: white; margin: 2% auto; padding: 25px; width: 90%; max-width: 850px; border-radius: 15px; max-height: 85vh; overflow-y: auto; }
-        .img-evidencia { width: 140px; height: 140px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #ddd; transition: 0.3s; }
+        .modal-content { background: white; margin: 2% auto; padding: 25px; width: 90%; max-width: 900px; border-radius: 15px; max-height: 85vh; overflow-y: auto; }
+        .detalle-item { border-bottom: 1px solid #eee; padding: 15px 0; display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+        .detalle-texto { flex: 1; min-width: 280px; }
+        .pregunta-unificada { margin: 0; font-size: 1.05em; line-height: 1.4; color: var(--primary); }
+        .pregunta-unificada b { color: var(--accent); text-transform: uppercase; font-size: 0.9em; }
+        .img-evidencia { width: 160px; height: 160px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #ddd; transition: 0.3s; }
         .img-evidencia:hover { transform: scale(1.05); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
     </style>
 </head>
@@ -63,20 +64,20 @@
     </div>
 
     <div class="top-row">
-        <div class="card" style="text-align: center; display: flex; flex-direction: column; justify-content: center;">
+        <div class="card" style="text-align: center;">
             <div id="main-score" style="font-size: 3.5em; font-weight: bold; color: var(--primary);">0%</div>
-            <div style="color: gray; font-weight: bold;">CUMPLIMIENTO PROMEDIO</div>
+            <div style="color: gray; font-weight: bold; font-size: 0.8em;">CUMPLIMIENTO PROMEDIO</div>
         </div>
         <div class="action-plan">
-            <h3>⚠️ Plan de Acción Sugerido</h3>
-            <div id="puntos-criticos">Cargando datos estratégicos...</div>
+            <h3>⚠️ Plan de Acción Sugerido (Puntos Críticos)</h3>
+            <div id="puntos-criticos">Cargando análisis de fallas...</div>
         </div>
     </div>
 
     <div class="summary-grid">
-        <div class="card summary-card"><h4>📍 Por Ciudad</h4><div id="res-loc"></div></div>
-        <div class="card summary-card"><h4>🏢 Por Departamento</h4><div id="res-dep"></div></div>
-        <div class="card summary-card"><h4>❓ Por Proceso (Preguntas)</h4><div id="res-pre"></div></div>
+        <div class="card"><h4>📍 Por Ciudad</h4><div id="res-loc"></div></div>
+        <div class="card"><h4>🏢 Por Departamento</h4><div id="res-dep"></div></div>
+        <div class="card"><h4>❓ Por Proceso</h4><div id="res-pre"></div></div>
     </div>
 
     <div class="table-container">
@@ -90,7 +91,7 @@
 <div id="modalDetalle" class="modal">
     <div class="modal-content">
         <span onclick="cerrarModal()" style="float:right; cursor:pointer; font-weight:bold; color:var(--danger)">[ CERRAR ]</span>
-        <h3 id="modal-titulo">Detalle de Auditoría</h3>
+        <h3 id="modal-titulo" style="margin-top:0">Detalle de Auditoría</h3>
         <hr>
         <div id="modal-body"></div>
     </div>
@@ -125,7 +126,6 @@
         const fin = new Date(y, m + 1, 0, 23, 59, 59).toISOString();
 
         let q = _supabase.from('evaluaciones').select('*, bodegas!inner(*), auditores(nombre)').gte('fecha', ini).lte('fecha', fin);
-        
         if(document.getElementById('f-aud').value) q = q.eq('auditor_id', document.getElementById('f-aud').value);
         if(document.getElementById('f-loc').value) q = q.eq('bodegas.localizacion', document.getElementById('f-loc').value);
         if(document.getElementById('f-dep').value) q = q.eq('bodegas.departamento', document.getElementById('f-dep').value);
@@ -137,16 +137,13 @@
 
     async function renderDashboard(data) {
         if(!data || data.length === 0) {
-            document.getElementById('lista-evaluaciones').innerHTML = '<tr><td colspan="4" style="text-align:center">Sin datos en este periodo</td></tr>';
+            document.getElementById('lista-evaluaciones').innerHTML = '<tr><td colspan="4" style="text-align:center">Sin datos</td></tr>';
             return;
         }
-        
-        // 1. Puntaje General
         const avg = data.reduce((acc, v)=> acc + v.calificacion_final, 0) / data.length;
         document.getElementById('main-score').innerText = avg.toFixed(1) + "%";
         document.getElementById('main-score').style.color = avg >= 90 ? 'var(--success)' : (avg >= 80 ? 'var(--warning)' : 'var(--danger)');
 
-        // 2. Tabla
         document.getElementById('lista-evaluaciones').innerHTML = data.map(ev => `
             <tr onclick="verDetalle('${ev.id}', '${ev.bodegas.nombre}', '${ev.auditores?.nombre}')">
                 <td>${new Date(ev.fecha).toLocaleDateString()}</td>
@@ -155,40 +152,31 @@
                 <td style="font-weight:bold; color:${ev.calificacion_final>=90?'var(--success)':'var(--danger)'}">${ev.calificacion_final}%</td>
             </tr>`).join('');
 
-        // 3. Análisis de Preguntas y Plan de Acción
         const ids = data.map(x => x.id);
-        const { data: resp } = await _supabase.from('respuestas').select('cumple, pregunta_id, configuracion_preguntas(pregunta)').in('evaluacion_id', ids);
+        const { data: resp } = await _supabase.from('respuestas').select('cumple, pregunta_id, configuracion_preguntas(pregunta, titulo)').in('evaluacion_id', ids);
         
         const pStats = {};
         resp.forEach(r => {
-            if(!pStats[r.pregunta_id]) pStats[r.pregunta_id] = { t: r.configuracion_preguntas?.pregunta || 'Pregunta eliminada', si: 0, n: 0 };
+            if(!pStats[r.pregunta_id]) pStats[r.pregunta_id] = { t: r.configuracion_preguntas?.pregunta, si: 0, n: 0 };
             if(r.cumple) pStats[r.pregunta_id].si++;
             pStats[r.pregunta_id].n++;
         });
 
         const sorted = Object.values(pStats).sort((a,b)=> (a.si/a.n) - (b.si/b.n));
-
-        // Render Barras
         generarBarrasSimple(data, 'localizacion', 'res-loc');
         generarBarrasSimple(data, 'departamento', 'res-dep');
 
-        // Render Barras Preguntas (Procesos)
         document.getElementById('res-pre').innerHTML = sorted.slice(0, 5).map(s => {
             const p = (s.si/s.n)*100;
-            const color = p >= 90 ? 'var(--success)' : (p >= 70 ? 'var(--warning)' : 'var(--danger)');
             return `<div class="bar-container">
                 <div class="bar-label" title="${s.t}">${s.t}</div>
-                <div class="bar-bg"><div class="bar-fill" style="width:${p}%; background:${color}"></div></div>
-                <div style="width:35px; font-weight:bold;">${p.toFixed(0)}%</div>
+                <div class="bar-bg"><div class="bar-fill" style="width:${p}%; background:${p>80?'var(--success)':'var(--danger)'}"></div></div>
+                <div style="width:35px; font-weight:bold">${p.toFixed(0)}%</div>
             </div>`;
         }).join('');
 
-        // Plan de Acción Sugerido
         document.getElementById('puntos-criticos').innerHTML = sorted.slice(0, 3).map((s, i) => `
-            <div style="margin-bottom:10px;">
-                <strong>${i+1}. Revisar: ${s.t}</strong><br>
-                <small>Cumplimiento crítico: ${((s.si/s.n)*100).toFixed(1)}%. Se requiere intervención inmediata.</small>
-            </div>`).join('');
+            <div style="margin-bottom:8px;"><strong>${i+1}. ${s.t}</strong><br><small>Cumplimiento: ${((s.si/s.n)*100).toFixed(0)}%</small></div>`).join('');
     }
 
     function generarBarrasSimple(data, campo, id) {
@@ -203,45 +191,33 @@
             return `<div class="bar-container">
                 <div class="bar-label">${k}</div>
                 <div class="bar-bg"><div class="bar-fill" style="width:${p}%; background:var(--accent)"></div></div>
-                <div style="width:35px">${p.toFixed(1)}%</div>
+                <div>${p.toFixed(1)}%</div>
             </div>`;
         }).join('');
     }
 
     async function verDetalle(id, bNom, aNom) {
-        const { data, error } = await _supabase
-            .from('respuestas')
-            .select('*, configuracion_preguntas(pregunta, titulo)')
-            .eq('evaluacion_id', id);
-
-        if(error) return console.error(error);
-
-        document.getElementById('modal-titulo').innerText = `${bNom} | Auditó: ${aNom}`;
+        const { data } = await _supabase.from('respuestas').select('*, configuracion_preguntas(pregunta, titulo)').eq('evaluacion_id', id);
+        document.getElementById('modal-titulo').innerText = `${bNom} | Auditor: ${aNom}`;
         document.getElementById('modal-body').innerHTML = data.map(r => `
-            <div style="border-bottom:1px solid #eee; padding:15px 0; display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
-                <div style="flex: 1; min-width: 280px;">
-                    <p style="margin:0; font-weight:bold; color:var(--accent); font-size:0.8em; text-transform:uppercase;">${r.configuracion_preguntas?.titulo || 'Auditoría'}</p>
-                    <p style="margin:5px 0; font-size:1.05em;">${r.configuracion_preguntas?.pregunta}</p>
-                    <p style="margin:8px 0;">
-                        <span style="padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 0.8em; background: ${r.cumple ? '#e8f5e9' : '#ffebee'}; color: ${r.cumple ? 'var(--success)' : 'var(--danger)'}">
+            <div class="detalle-item">
+                <div class="detalle-texto">
+                    <p class="pregunta-unificada"><b>${r.configuracion_preguntas?.titulo || 'SECCIÓN'}:</b> ${r.configuracion_preguntas?.pregunta}</p>
+                    <div style="margin:10px 0;">
+                        <span style="padding:4px 10px; border-radius:4px; font-weight:bold; font-size:0.8em; background:${r.cumple?'#e8f5e9':'#ffebee'}; color:${r.cumple?'var(--success)':'var(--danger)'}">
                             ${r.cumple ? '✅ CONFORME' : '❌ NO CONFORME'}
                         </span>
-                    </p>
-                    <p style="margin:0; color:#666; font-size:0.9em;"><strong>Nota:</strong> ${r.observaciones || 'Sin observaciones'}</p>
+                    </div>
+                    <p style="margin:0; font-size:0.9em; color:#666"><strong>Observación:</strong> ${r.observaciones || 'Sin comentarios'}</p>
                 </div>
-                <div style="flex-shrink: 0;">
-                    ${r.foto_url 
-                        ? `<img src="${r.foto_url}" class="img-evidencia" onclick="window.open('${r.foto_url}', '_blank')" title="Ver en tamaño completo">` 
-                        : `<div style="width:140px; height:140px; border:1px dashed #ccc; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#999; font-size:0.8em;">Sin Foto</div>`
-                    }
+                <div style="flex-shrink:0">
+                    ${r.foto_url ? `<img src="${r.foto_url}" class="img-evidencia" onclick="window.open('${r.foto_url}')">` : `<div style="width:160px; height:160px; background:#f9f9f9; border:1px dashed #ccc; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#aaa; font-size:0.8em">Sin evidencia</div>`}
                 </div>
             </div>`).join('');
         document.getElementById('modalDetalle').style.display = 'block';
     }
 
     function cerrarModal() { document.getElementById('modalDetalle').style.display = 'none'; }
-    window.onclick = function(e) { if(e.target.className === 'modal') cerrarModal(); }
-
     init();
 </script>
 </body>
