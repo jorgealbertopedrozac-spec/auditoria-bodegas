@@ -3,88 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Configuración de Auditoría</title>
+    <title>Admin - Auditoría de Bodegas</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --secondary: #3498db; --accent: #27ae60; --bg: #f8f9fa; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        :root { --primary: #2c3e50; --secondary: #3498db; --accent: #27ae60; --warning: #f39c12; --danger: #e74c3c; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
         
-        /* Pestañas */
-        .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #eee; }
-        .tab { padding: 10px 20px; cursor: pointer; border: none; background: none; font-weight: bold; color: #7f8c8d; }
+        h2 { color: var(--primary); text-align: center; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        
+        /* Tabs */
+        .tabs { display: flex; gap: 10px; margin-bottom: 25px; border-bottom: 2px solid #eee; }
+        .tab { padding: 12px 25px; cursor: pointer; border: none; background: none; font-weight: bold; color: #95a5a6; transition: 0.3s; }
         .tab.active { color: var(--secondary); border-bottom: 3px solid var(--secondary); }
         
         .section { display: none; }
         .section.active { display: block; }
 
-        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; background: #f1f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-        label { display: block; font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #555; }
-        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        /* Form Estilos */
+        .form-box { background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 30px; border: 1px solid #e9ecef; }
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+        .full-width { grid-column: 1 / -1; }
         
-        button.btn-add { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; grid-column: 1 / -1; }
+        label { display: block; font-size: 0.85em; font-weight: bold; margin-bottom: 6px; color: #34495e; }
+        input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9em; }
-        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
-        th { background: #fdfdfd; color: var(--primary); }
-        .badge { background: #e8f4fd; color: #2980b9; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; }
+        .btn-action { width: 100%; padding: 12px; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        .btn-green { background: var(--accent); }
+        .btn-green:hover { background: #219150; }
+        .btn-orange { background: var(--warning); }
+        
+        /* Tablas */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; border-radius: 8px; overflow: hidden; }
+        th, td { text-align: left; padding: 15px; border-bottom: 1px solid #edf2f7; }
+        th { background: #f1f5f9; color: var(--primary); font-size: 0.9em; }
+        .badge { background: #ebf5fb; color: #2980b9; padding: 4px 10px; border-radius: 20px; font-weight: bold; font-size: 0.8em; }
+        
+        .btn-icon { border: none; padding: 8px; border-radius: 6px; cursor: pointer; color: white; margin-right: 5px; }
+        .edit-btn { background: var(--warning); }
+        .del-btn { background: var(--danger); }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>⚙️ Panel de Administración</h2>
+    <h2>⚙️ Panel Administrativo de Almacenes</h2>
     
     <div class="tabs">
-        <button class="tab active" onclick="showTab('tab-bodegas')">📍 Bodegas</button>
-        <button class="tab" onclick="showTab('tab-preguntas')">❓ Catálogo de Preguntas</button>
+        <button class="tab active" onclick="switchTab('tab-bodegas')">📍 Gestión de Bodegas</button>
+        <button class="tab" onclick="switchTab('tab-preguntas')">📋 Catálogo de Preguntas</button>
     </div>
 
     <div id="tab-bodegas" class="section active">
-        <div class="form-grid">
-            <div>
-                <label>Localización (Ciudad)</label>
-                <input type="text" id="b-loc" placeholder="Ej: Aguascalientes">
+        <div class="form-box">
+            <div class="grid-3">
+                <div>
+                    <label>📍 Localización (Ciudad)</label>
+                    <input type="text" id="b-loc" placeholder="Ej: Aguascalientes">
+                </div>
+                <div>
+                    <label>🏢 Departamento</label>
+                    <input type="text" id="b-dep" placeholder="Ej: Cerámicos">
+                </div>
+                <div>
+                    <label>📦 Nombre/ID Bodega</label>
+                    <input type="text" id="b-nom" placeholder="Ej: CC">
+                </div>
             </div>
-            <div>
-                <label>Departamento</label>
-                <input type="text" id="b-dep" placeholder="Ej: Cerámicos">
-            </div>
-            <div>
-                <label>Nombre de Bodega (ID)</label>
-                <input type="text" id="b-nom" placeholder="Ej: CC">
-            </div>
-            <button class="btn-add" onclick="guardarBodega()">Registrar Bodega</button>
+            <button class="btn-action btn-green" id="btn-save-bodega" onclick="guardarBodega()">Registrar Nueva Bodega</button>
         </div>
-        <table id="tablaBodegas">
-            <thead><tr><th>Localización</th><th>Departamento</th><th>Bodega</th><th>Acción</th></tr></thead>
-            <tbody></tbody>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Localización</th>
+                    <th>Departamento</th>
+                    <th>Bodega</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-bodegas"></tbody>
         </table>
     </div>
 
     <div id="tab-preguntas" class="section">
-        <div class="form-grid">
-            <div>
-                <label>Sección (Título)</label>
-                <input type="text" id="p-tit" placeholder="1. Identificación...">
+        <div class="form-box">
+            <div class="grid-3">
+                <div>
+                    <label>📂 Título (Sección)</label>
+                    <input type="text" id="p-tit" placeholder="Ej: 1. Identificación y Clasificación">
+                </div>
+                <div>
+                    <label>📑 Desglose (Sub-sección)</label>
+                    <input type="text" id="p-des" placeholder="Ej: 1.1 Áreas identificadas">
+                </div>
+                <div>
+                    <label>⚖️ Ponderación (Puntos)</label>
+                    <input type="number" id="p-pts" value="10">
+                </div>
+                <div class="full-width">
+                    <label>❓ Pregunta Específica</label>
+                    <textarea id="p-pre" rows="2" placeholder="Escribe la pregunta aquí..."></textarea>
+                </div>
             </div>
-            <div>
-                <label>Sub-sección (Desglose)</label>
-                <input type="text" id="p-des" placeholder="1.1 Áreas identificadas...">
-            </div>
-            <div>
-                <label>Peso (Puntos)</label>
-                <input type="number" id="p-pts" value="10">
-            </div>
-            <div style="grid-column: 1 / -1;">
-                <label>Pregunta Específica</label>
-                <textarea id="p-pre" rows="2"></textarea>
-            </div>
-            <button class="btn-add" onclick="guardarPregunta()">Añadir al Catálogo</button>
+            <button class="btn-action btn-green" id="btn-save-pregunta" onclick="guardarPregunta()">Añadir al Catálogo</button>
         </div>
-        <table id="tablaPreguntas">
-            <thead><tr><th>Sección / Desglose</th><th>Pregunta</th><th>Peso</th><th>Acción</th></tr></thead>
-            <tbody></tbody>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Estructura (Sección/Sub)</th>
+                    <th>Pregunta</th>
+                    <th>Peso</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-preguntas"></tbody>
         </table>
     </div>
 </div>
@@ -94,26 +128,33 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqY2t6YmVndHZpYW51cmZ2dWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxOTYzMzUsImV4cCI6MjA4Mjc3MjMzNX0.64zrKi0p1KiDwtBODLRf8O4sRvnn0o9QyoQUYHvVFd0';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Navegación de pestañas
-    function showTab(id) {
+    let editandoPreguntaId = null;
+    let editandoBodegaId = null;
+
+    // Cambiar entre pestañas
+    function switchTab(id) {
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.getElementById(id).classList.add('active');
-        event.target.classList.add('active');
+        event.currentTarget.classList.add('active');
+        
         if(id === 'tab-bodegas') cargarBodegas();
         else cargarPreguntas();
     }
 
-    // --- LÓGICA BODEGAS ---
+    // --- GESTIÓN DE BODEGAS ---
     async function cargarBodegas() {
-        const { data } = await _supabase.from('bodegas').select('*').order('localizacion');
-        const tbody = document.querySelector('#tablaBodegas tbody');
+        const { data } = await _supabase.from('bodegas').select('*').order('localizacion', {ascending: true});
+        const tbody = document.getElementById('tbody-bodegas');
         tbody.innerHTML = data.map(b => `
             <tr>
                 <td>${b.localizacion}</td>
                 <td>${b.departamento}</td>
                 <td><strong>${b.nombre}</strong></td>
-                <td><button onclick="eliminar('bodegas','${b.id}')">🗑️</button></td>
+                <td>
+                    <button class="btn-icon edit-btn" onclick='prepararEdicionBodega(${JSON.stringify(b)})'>✏️</button>
+                    <button class="btn-icon del-btn" onclick="eliminarRegistro('bodegas','${b.id}')">🗑️</button>
+                </td>
             </tr>
         `).join('');
     }
@@ -122,23 +163,48 @@
         const loc = document.getElementById('b-loc').value;
         const dep = document.getElementById('b-dep').value;
         const nom = document.getElementById('b-nom').value;
-        if(!loc || !dep || !nom) return alert("Completa todos los campos");
 
-        await _supabase.from('bodegas').insert([{ localizacion: loc, departamento: dep, nombre: nom }]);
-        document.getElementById('b-nom').value = '';
+        if(!loc || !dep || !nom) return alert("Por favor, llena todos los campos de la bodega.");
+
+        const payload = { localizacion: loc, departamento: dep, nombre: nom };
+
+        if(editandoBodegaId) {
+            await _supabase.from('bodegas').update(payload).eq('id', editandoBodegaId);
+            editandoBodegaId = null;
+            document.getElementById('btn-save-bodega').innerText = "Registrar Nueva Bodega";
+            document.getElementById('btn-save-bodega').className = "btn-action btn-green";
+        } else {
+            await _supabase.from('bodegas').insert([payload]);
+        }
+
+        limpiarCamposBodega();
         cargarBodegas();
     }
 
-    // --- LÓGICA PREGUNTAS ---
+    function prepararEdicionBodega(b) {
+        document.getElementById('b-loc').value = b.localizacion;
+        document.getElementById('b-dep').value = b.departamento;
+        document.getElementById('b-nom').value = b.nombre;
+        editandoBodegaId = b.id;
+        const btn = document.getElementById('btn-save-bodega');
+        btn.innerText = "💾 Guardar Cambios en Bodega";
+        btn.className = "btn-action btn-orange";
+        window.scrollTo(0,0);
+    }
+
+    // --- GESTIÓN DE PREGUNTAS ---
     async function cargarPreguntas() {
-        const { data } = await _supabase.from('configuracion_preguntas').select('*').order('titulo');
-        const tbody = document.querySelector('#tablaPreguntas tbody');
+        const { data } = await _supabase.from('configuracion_preguntas').select('*').order('titulo', {ascending: true});
+        const tbody = document.getElementById('tbody-preguntas');
         tbody.innerHTML = data.map(p => `
             <tr>
                 <td><small>${p.titulo}</small><br><strong>${p.desglose}</strong></td>
                 <td>${p.pregunta}</td>
                 <td><span class="badge">${p.ponderacion} pts</span></td>
-                <td><button onclick="eliminar('configuracion_preguntas','${p.id}')">🗑️</button></td>
+                <td>
+                    <button class="btn-icon edit-btn" onclick='prepararEdicionPregunta(${JSON.stringify(p)})'>✏️</button>
+                    <button class="btn-icon del-btn" onclick="eliminarRegistro('configuracion_preguntas','${p.id}')">🗑️</button>
+                </td>
             </tr>
         `).join('');
     }
@@ -149,21 +215,54 @@
         const pre = document.getElementById('p-pre').value;
         const pts = document.getElementById('p-pts').value;
 
-        await _supabase.from('configuracion_preguntas').insert([{ 
-            titulo: tit, desglose: des, pregunta: pre, ponderacion: parseFloat(pts) 
-        }]);
-        document.getElementById('p-pre').value = '';
+        if(!pre || !pts) return alert("Falta la pregunta o la ponderación.");
+
+        const payload = { titulo: tit, desglose: des, pregunta: pre, ponderacion: parseFloat(pts) };
+
+        if(editandoPreguntaId) {
+            await _supabase.from('configuracion_preguntas').update(payload).eq('id', editandoPreguntaId);
+            editandoPreguntaId = null;
+            document.getElementById('btn-save-pregunta').innerText = "Añadir al Catálogo";
+            document.getElementById('btn-save-pregunta').className = "btn-action btn-green";
+        } else {
+            await _supabase.from('configuracion_preguntas').insert([payload]);
+        }
+
+        limpiarCamposPregunta();
         cargarPreguntas();
     }
 
-    async function eliminar(tabla, id) {
-        if(confirm("¿Eliminar registro?")) {
+    function prepararEdicionPregunta(p) {
+        document.getElementById('p-tit').value = p.titulo;
+        document.getElementById('p-des').value = p.desglose;
+        document.getElementById('p-pre').value = p.pregunta;
+        document.getElementById('p-pts').value = p.ponderacion;
+        editandoPreguntaId = p.id;
+        const btn = document.getElementById('btn-save-pregunta');
+        btn.innerText = "💾 Guardar Cambios en Pregunta";
+        btn.className = "btn-action btn-orange";
+        window.scrollTo(0,0);
+    }
+
+    // --- FUNCIONES COMUNES ---
+    async function eliminarRegistro(tabla, id) {
+        if(confirm("¿Estás seguro de eliminar este registro? Esta acción no se puede deshacer.")) {
             await _supabase.from(tabla).delete().eq('id', id);
             tabla === 'bodegas' ? cargarBodegas() : cargarPreguntas();
         }
     }
 
+    function limpiarCamposBodega() {
+        document.getElementById('b-nom').value = '';
+    }
+
+    function limpiarCamposPregunta() {
+        document.getElementById('p-pre').value = '';
+    }
+
+    // Carga inicial
     cargarBodegas();
 </script>
+
 </body>
 </html>
