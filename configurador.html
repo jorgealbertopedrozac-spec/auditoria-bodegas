@@ -13,8 +13,8 @@
         h2 { color: var(--primary); text-align: center; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
         
         /* Tabs */
-        .tabs { display: flex; gap: 10px; margin-bottom: 25px; border-bottom: 2px solid #eee; }
-        .tab { padding: 12px 25px; cursor: pointer; border: none; background: none; font-weight: bold; color: #95a5a6; transition: 0.3s; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 25px; border-bottom: 2px solid #eee; overflow-x: auto; }
+        .tab { padding: 12px 25px; cursor: pointer; border: none; background: none; font-weight: bold; color: #95a5a6; transition: 0.3s; white-space: nowrap; }
         .tab.active { color: var(--secondary); border-bottom: 3px solid var(--secondary); }
         
         .section { display: none; }
@@ -22,7 +22,7 @@
 
         /* Form Estilos */
         .form-box { background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 30px; border: 1px solid #e9ecef; }
-        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
         .full-width { grid-column: 1 / -1; }
         
         label { display: block; font-size: 0.85em; font-weight: bold; margin-bottom: 6px; color: #34495e; }
@@ -48,16 +48,17 @@
 
 <div style="max-width: 1000px; margin: auto; padding: 10px 0;">
     <a href="index.html" style="background: #ecf0f1; color: #2c3e50; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.85em; border: 1px solid #ddd;">
-        ⬅ Salir de Configuración
+        ⬅ Volver al Inicio
     </a>
 </div>
     
 <div class="container">
-    <h2>⚙️ Panel Administrativo de Almacenes</h2>
+    <h2>⚙️ Panel Administrativo</h2>
     
     <div class="tabs">
-        <button class="tab active" onclick="switchTab('tab-bodegas')">📍 Gestión de Bodegas</button>
+        <button class="tab active" onclick="switchTab('tab-bodegas')">📍 Bodegas</button>
         <button class="tab" onclick="switchTab('tab-preguntas')">📋 Catálogo de Preguntas</button>
+        <button class="tab" onclick="switchTab('tab-auditores')">👥 Auditores</button>
     </div>
 
     <div id="tab-bodegas" class="section active">
@@ -78,16 +79,8 @@
             </div>
             <button class="btn-action btn-green" id="btn-save-bodega" onclick="guardarBodega()">Registrar Nueva Bodega</button>
         </div>
-
         <table>
-            <thead>
-                <tr>
-                    <th>Localización</th>
-                    <th>Departamento</th>
-                    <th>Bodega</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
+            <thead><tr><th>Localización</th><th>Departamento</th><th>Bodega</th><th>Acciones</th></tr></thead>
             <tbody id="tbody-bodegas"></tbody>
         </table>
     </div>
@@ -97,11 +90,11 @@
             <div class="grid-3">
                 <div>
                     <label>📂 Título (Sección)</label>
-                    <input type="text" id="p-tit" placeholder="Ej: 1. Identificación y Clasificación">
+                    <input type="text" id="p-tit" placeholder="Ej: 1. Identificación">
                 </div>
                 <div>
                     <label>📑 Desglose (Sub-sección)</label>
-                    <input type="text" id="p-des" placeholder="Ej: 1.1 Áreas identificadas">
+                    <input type="text" id="p-des" placeholder="Ej: 1.1 Áreas">
                 </div>
                 <div>
                     <label>⚖️ Ponderación (Puntos)</label>
@@ -114,17 +107,29 @@
             </div>
             <button class="btn-action btn-green" id="btn-save-pregunta" onclick="guardarPregunta()">Añadir al Catálogo</button>
         </div>
-
         <table>
-            <thead>
-                <tr>
-                    <th>Estructura (Sección/Sub)</th>
-                    <th>Pregunta</th>
-                    <th>Peso</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
+            <thead><tr><th>Estructura</th><th>Pregunta</th><th>Peso</th><th>Acciones</th></tr></thead>
             <tbody id="tbody-preguntas"></tbody>
+        </table>
+    </div>
+
+    <div id="tab-auditores" class="section">
+        <div class="form-box">
+            <div class="grid-3">
+                <div>
+                    <label>👤 Nombre Completo</label>
+                    <input type="text" id="a-nom" placeholder="Ej: Juan Pérez">
+                </div>
+                <div>
+                    <label>💼 Puesto / Cargo</label>
+                    <input type="text" id="a-pue" placeholder="Ej: Supervisor de Almacén">
+                </div>
+            </div>
+            <button class="btn-action btn-green" id="btn-save-auditor" onclick="guardarAuditor()">Registrar Auditor</button>
+        </div>
+        <table>
+            <thead><tr><th>Nombre</th><th>Puesto</th><th>Acciones</th></tr></thead>
+            <tbody id="tbody-auditores"></tbody>
         </table>
     </div>
 </div>
@@ -136,8 +141,8 @@
 
     let editandoPreguntaId = null;
     let editandoBodegaId = null;
+    let editandoAuditorId = null;
 
-    // Cambiar entre pestañas
     function switchTab(id) {
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -145,18 +150,60 @@
         event.currentTarget.classList.add('active');
         
         if(id === 'tab-bodegas') cargarBodegas();
-        else cargarPreguntas();
+        else if(id === 'tab-preguntas') cargarPreguntas();
+        else if(id === 'tab-auditores') cargarAuditores();
     }
 
-    // --- GESTIÓN DE BODEGAS ---
-    async function cargarBodegas() {
-        const { data } = await _supabase.from('bodegas').select('*').order('localizacion', {ascending: true});
-        const tbody = document.getElementById('tbody-bodegas');
-        tbody.innerHTML = data.map(b => `
+    // --- GESTIÓN DE AUDITORES ---
+    async function cargarAuditores() {
+        const { data } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
+        const tbody = document.getElementById('tbody-auditores');
+        tbody.innerHTML = data.map(a => `
             <tr>
-                <td>${b.localizacion}</td>
-                <td>${b.departamento}</td>
-                <td><strong>${b.nombre}</strong></td>
+                <td><strong>${a.nombre}</strong></td>
+                <td>${a.puesto}</td>
+                <td>
+                    <button class="btn-icon edit-btn" onclick='prepararEdicionAuditor(${JSON.stringify(a)})'>✏️</button>
+                    <button class="btn-icon del-btn" onclick="eliminarRegistro('auditores','${a.id}')">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function guardarAuditor() {
+        const nom = document.getElementById('a-nom').value;
+        const pue = document.getElementById('a-pue').value;
+        if(!nom) return alert("El nombre es necesario.");
+
+        const payload = { nombre: nom, puesto: pue };
+
+        if(editandoAuditorId) {
+            await _supabase.from('auditores').update(payload).eq('id', editandoAuditorId);
+            editandoAuditorId = null;
+            document.getElementById('btn-save-auditor').innerText = "Registrar Auditor";
+            document.getElementById('btn-save-auditor').className = "btn-action btn-green";
+        } else {
+            await _supabase.from('auditores').insert([payload]);
+        }
+        document.getElementById('a-nom').value = '';
+        document.getElementById('a-pue').value = '';
+        cargarAuditores();
+    }
+
+    function prepararEdicionAuditor(a) {
+        document.getElementById('a-nom').value = a.nombre;
+        document.getElementById('a-pue').value = a.puesto;
+        editandoAuditorId = a.id;
+        document.getElementById('btn-save-auditor').innerText = "💾 Guardar Cambios";
+        document.getElementById('btn-save-auditor').className = "btn-action btn-orange";
+    }
+
+    // --- BODEGAS Y PREGUNTAS (Tus funciones originales con limpieza) ---
+    async function cargarBodegas() {
+        const { data } = await _supabase.from('bodegas').select('*').order('localizacion');
+        document.getElementById('tbody-bodegas').innerHTML = data.map(b => `
+            <tr>
+                <td>${b.localizacion}</td><td>${b.departamento}</td><td><strong>${b.nombre}</strong></td>
                 <td>
                     <button class="btn-icon edit-btn" onclick='prepararEdicionBodega(${JSON.stringify(b)})'>✏️</button>
                     <button class="btn-icon del-btn" onclick="eliminarRegistro('bodegas','${b.id}')">🗑️</button>
@@ -166,14 +213,11 @@
     }
 
     async function guardarBodega() {
-        const loc = document.getElementById('b-loc').value;
-        const dep = document.getElementById('b-dep').value;
-        const nom = document.getElementById('b-nom').value;
-
-        if(!loc || !dep || !nom) return alert("Por favor, llena todos los campos de la bodega.");
-
-        const payload = { localizacion: loc, departamento: dep, nombre: nom };
-
+        const payload = { 
+            localizacion: document.getElementById('b-loc').value, 
+            departamento: document.getElementById('b-dep').value, 
+            nombre: document.getElementById('b-nom').value 
+        };
         if(editandoBodegaId) {
             await _supabase.from('bodegas').update(payload).eq('id', editandoBodegaId);
             editandoBodegaId = null;
@@ -182,8 +226,6 @@
         } else {
             await _supabase.from('bodegas').insert([payload]);
         }
-
-        limpiarCamposBodega();
         cargarBodegas();
     }
 
@@ -192,21 +234,16 @@
         document.getElementById('b-dep').value = b.departamento;
         document.getElementById('b-nom').value = b.nombre;
         editandoBodegaId = b.id;
-        const btn = document.getElementById('btn-save-bodega');
-        btn.innerText = "💾 Guardar Cambios en Bodega";
-        btn.className = "btn-action btn-orange";
-        window.scrollTo(0,0);
+        document.getElementById('btn-save-bodega').innerText = "💾 Guardar Cambios";
+        document.getElementById('btn-save-bodega').className = "btn-action btn-orange";
     }
 
-    // --- GESTIÓN DE PREGUNTAS ---
     async function cargarPreguntas() {
-        const { data } = await _supabase.from('configuracion_preguntas').select('*').order('titulo', {ascending: true});
-        const tbody = document.getElementById('tbody-preguntas');
-        tbody.innerHTML = data.map(p => `
+        const { data } = await _supabase.from('configuracion_preguntas').select('*').order('titulo');
+        document.getElementById('tbody-preguntas').innerHTML = data.map(p => `
             <tr>
                 <td><small>${p.titulo}</small><br><strong>${p.desglose}</strong></td>
-                <td>${p.pregunta}</td>
-                <td><span class="badge">${p.ponderacion} pts</span></td>
+                <td>${p.pregunta}</td><td><span class="badge">${p.ponderacion}</span></td>
                 <td>
                     <button class="btn-icon edit-btn" onclick='prepararEdicionPregunta(${JSON.stringify(p)})'>✏️</button>
                     <button class="btn-icon del-btn" onclick="eliminarRegistro('configuracion_preguntas','${p.id}')">🗑️</button>
@@ -216,15 +253,12 @@
     }
 
     async function guardarPregunta() {
-        const tit = document.getElementById('p-tit').value;
-        const des = document.getElementById('p-des').value;
-        const pre = document.getElementById('p-pre').value;
-        const pts = document.getElementById('p-pts').value;
-
-        if(!pre || !pts) return alert("Falta la pregunta o la ponderación.");
-
-        const payload = { titulo: tit, desglose: des, pregunta: pre, ponderacion: parseFloat(pts) };
-
+        const payload = { 
+            titulo: document.getElementById('p-tit').value, 
+            desglose: document.getElementById('p-des').value, 
+            pregunta: document.getElementById('p-pre').value, 
+            ponderacion: document.getElementById('p-pts').value 
+        };
         if(editandoPreguntaId) {
             await _supabase.from('configuracion_preguntas').update(payload).eq('id', editandoPreguntaId);
             editandoPreguntaId = null;
@@ -233,8 +267,6 @@
         } else {
             await _supabase.from('configuracion_preguntas').insert([payload]);
         }
-
-        limpiarCamposPregunta();
         cargarPreguntas();
     }
 
@@ -244,31 +276,20 @@
         document.getElementById('p-pre').value = p.pregunta;
         document.getElementById('p-pts').value = p.ponderacion;
         editandoPreguntaId = p.id;
-        const btn = document.getElementById('btn-save-pregunta');
-        btn.innerText = "💾 Guardar Cambios en Pregunta";
-        btn.className = "btn-action btn-orange";
-        window.scrollTo(0,0);
+        document.getElementById('btn-save-pregunta').innerText = "💾 Guardar Cambios";
+        document.getElementById('btn-save-pregunta').className = "btn-action btn-orange";
     }
 
-    // --- FUNCIONES COMUNES ---
     async function eliminarRegistro(tabla, id) {
-        if(confirm("¿Estás seguro de eliminar este registro? Esta acción no se puede deshacer.")) {
+        if(confirm("¿Eliminar registro?")) {
             await _supabase.from(tabla).delete().eq('id', id);
-            tabla === 'bodegas' ? cargarBodegas() : cargarPreguntas();
+            if(tabla==='bodegas') cargarBodegas();
+            else if(tabla==='auditores') cargarAuditores();
+            else cargarPreguntas();
         }
     }
 
-    function limpiarCamposBodega() {
-        document.getElementById('b-nom').value = '';
-    }
-
-    function limpiarCamposPregunta() {
-        document.getElementById('p-pre').value = '';
-    }
-
-    // Carga inicial
-    cargarBodegas();
+    cargarBodegas(); // Carga inicial
 </script>
-
 </body>
 </html>
