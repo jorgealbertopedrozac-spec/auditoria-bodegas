@@ -7,53 +7,56 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 10px; color: #333; }
         .container { max-width: 1250px; margin: auto; }
         
-        .btn-regresar { display: inline-block; margin-bottom: 15px; background: #fff; color: var(--primary); padding: 8px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; border: 1px solid #ddd; }
+        .btn-regresar { display: inline-block; margin-bottom: 15px; background: #fff; color: var(--primary); padding: 8px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; border: 1px solid #ddd; font-size: 0.9em; }
 
         /* Filtros */
-        .filter-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
-        .filter-group label { display: block; font-size: 0.75rem; font-weight: bold; margin-bottom: 5px; color: #666; }
-        select, input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; outline: none; }
+        .filter-card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+        .filter-group label { display: block; font-size: 0.7rem; font-weight: bold; margin-bottom: 4px; color: #666; }
+        select, input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; outline: none; font-size: 0.9em; background: #fff; box-sizing: border-box; }
 
-        /* KPI y Plan de Acción */
-        .top-row { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-bottom: 25px; }
+        /* KPI y Plan de Acción - Adaptativo */
+        .top-row { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 25px; }
+        @media (min-width: 768px) { .top-row { grid-template-columns: 1fr 2fr; } }
+
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .action-plan { background: #fff4e5; border-left: 5px solid var(--warning); padding: 20px; border-radius: 12px; }
-        .action-plan h3 { margin-top: 0; color: #856404; font-size: 1.1em; border-bottom: 1px solid #ffeeba; padding-bottom: 10px; }
+        .action-plan { background: #fffaf0; border-left: 5px solid var(--warning); padding: 15px; border-radius: 12px; }
+        .action-plan h3 { margin-top: 0; color: #856404; font-size: 1em; border-bottom: 1px solid #ffeeba; padding-bottom: 10px; }
         
         /* Gráficos de Barras */
-        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px; }
-        .bar-container { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 0.85em; }
-        .bar-label { width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .bar-container { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 0.8em; }
+        .bar-label { width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .bar-bg { flex: 1; background: #eee; height: 10px; border-radius: 5px; overflow: hidden; }
         .bar-fill { height: 100%; transition: 0.8s ease-in-out; }
 
-        /* Modal y Galería de Fotos */
-        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); }
-        .modal-content { background: white; margin: 2% auto; padding: 25px; width: 90%; max-width: 900px; border-radius: 15px; max-height: 85vh; overflow-y: auto; }
-        
-        .seccion-header { background: #f8f9fa; padding: 10px 15px; margin: 20px 0 10px 0; border-radius: 8px; color: var(--accent); font-weight: bold; text-transform: uppercase; font-size: 0.9em; border-left: 4px solid var(--accent); }
-        .pregunta-row { padding: 15px; border-bottom: 1px solid #f0f0f0; display: flex; flex-direction: column; gap: 10px; }
-        
-        .galeria-fotos { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
-        .img-evidencia { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #ddd; transition: 0.2s; }
-        .img-evidencia:hover { transform: scale(1.05); border-color: var(--accent); }
+        /* Hallazgos Estilizados */
+        .hallazgo-item { margin-bottom: 10px; padding: 12px; background: white; border-radius: 8px; border: 1px solid #eee; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
 
-        /* Tabla Principal */
-        .table-container { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #f8f9fa; padding: 12px; font-size: 0.8em; text-align: left; color: #7f8c8d; text-transform: uppercase; }
-        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 0.9em; }
-        tr:hover { background: #f1f8ff; cursor: pointer; }
+        /* Modal y Galería */
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
+        .modal-content { background: white; margin: 5% auto; padding: 20px; width: 95%; max-width: 850px; border-radius: 15px; max-height: 85vh; overflow-y: auto; box-sizing: border-box; }
+        
+        .seccion-header { background: #f0f4f8; padding: 10px; margin: 15px 0 5px 0; border-radius: 6px; color: var(--primary); font-weight: bold; font-size: 0.85em; border-left: 4px solid var(--accent); }
+        .pregunta-row { padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+        
+        .galeria-fotos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        .img-evidencia { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
+
+        /* Tabla Principal Adaptativa */
+        .table-container { background: white; border-radius: 12px; overflow-x: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; min-width: 500px; }
+        th { background: #f8f9fa; padding: 10px; font-size: 0.75em; text-align: left; color: #7f8c8d; }
+        td { padding: 10px; border-bottom: 1px solid #eee; font-size: 0.85em; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <a href="index.html" class="btn-regresar">🏠 Inicio</a>
-    <h2>📊 Inteligencia de Auditoría</h2>
+    <h2 style="font-size: 1.4em; margin-bottom: 15px;">📊 Inteligencia de Auditoría</h2>
 
     <div class="filter-card">
         <div class="filter-group"><label>👤 Auditor</label><select id="f-aud" onchange="aplicarFiltros()"><option value="">Todos</option></select></div>
@@ -65,12 +68,12 @@
     </div>
 
     <div class="top-row">
-        <div class="card" style="text-align: center; display: flex; flex-direction: column; justify-content: center;">
-            <div id="main-score" style="font-size: 3.5em; font-weight: bold; color: var(--primary);">0%</div>
-            <div style="color: gray; font-weight: bold; font-size: 0.7em;">PROMEDIO DE CUMPLIMIENTO</div>
+        <div class="card" style="text-align: center;">
+            <div id="main-score" style="font-size: 3em; font-weight: bold; color: var(--primary);">0%</div>
+            <div style="color: gray; font-weight: bold; font-size: 0.7em; text-transform: uppercase; letter-spacing: 1px;">Cumplimiento Promedio</div>
         </div>
         <div class="action-plan">
-            <h3>⚠️ Hallazgos Críticos y Plan de Acción</h3>
+            <h3>⚠️ Hallazgos Críticos</h3>
             <div id="puntos-criticos">Analizando datos...</div>
         </div>
     </div>
@@ -83,7 +86,7 @@
 
     <div class="table-container">
         <table>
-            <thead><tr><th>Fecha</th><th>Auditor</th><th>Bodega</th><th>Resultado</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Auditor</th><th>Bodega</th><th>Res.</th></tr></thead>
             <tbody id="lista-evaluaciones"></tbody>
         </table>
     </div>
@@ -91,8 +94,9 @@
 
 <div id="modalDetalle" class="modal">
     <div class="modal-content">
-        <span onclick="cerrarModal()" style="float:right; cursor:pointer; font-weight:bold; color:var(--danger)">[ CERRAR ]</span>
-        <h3 id="modal-titulo" style="margin:0">Detalle de Auditoría</h3>
+        <span onclick="cerrarModal()" style="float:right; cursor:pointer; font-weight:bold; color:var(--danger); background: #ffeeee; padding: 5px 10px; border-radius: 5px;">CERRAR</span>
+        <h3 id="modal-titulo" style="margin:0; font-size:1.1em; max-width: 80%;">Detalle</h3>
+        <hr style="border:0; border-top:1px solid #eee; margin: 15px 0;">
         <div id="modal-body"></div>
     </div>
 </div>
@@ -138,6 +142,7 @@
     async function renderDashboard(data) {
         if(!data || data.length === 0) {
             document.getElementById('lista-evaluaciones').innerHTML = '<tr><td colspan="4">Sin datos</td></tr>';
+            document.getElementById('main-score').innerText = "0%";
             return;
         }
         const avg = data.reduce((acc, v)=> acc + v.calificacion_final, 0) / data.length;
@@ -146,10 +151,10 @@
 
         document.getElementById('lista-evaluaciones').innerHTML = data.map(ev => `
             <tr onclick="verDetalle('${ev.id}', '${ev.bodegas.nombre}', '${ev.auditores?.nombre}')">
-                <td>${new Date(ev.fecha).toLocaleDateString()}</td>
-                <td>${ev.auditores?.nombre || 'N/A'}</td>
+                <td>${new Date(ev.fecha).toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit'})}</td>
+                <td>${ev.auditores?.nombre.split(' ')[0] || 'N/A'}</td>
                 <td>${ev.bodegas.nombre}</td>
-                <td style="font-weight:bold; color:${ev.calificacion_final>=90?'var(--success)':'var(--danger)'}">${ev.calificacion_final}%</td>
+                <td style="font-weight:bold; color:${ev.calificacion_final>=90?'var(--success)':'var(--danger)'}">${ev.calificacion_final.toFixed(0)}%</td>
             </tr>`).join('');
 
         const ids = data.map(x => x.id);
@@ -176,9 +181,10 @@
         }).join('');
 
         document.getElementById('puntos-criticos').innerHTML = sorted.slice(0, 3).map((s, i) => `
-            <div style="margin-bottom:12px; padding:10px; background:#fff; border-radius:8px;">
-                <span style="color:var(--danger); font-weight:bold;">#${i+1} FALLA PRIORITARIA:</span> ${s.t}<br>
-                <small style="color:#666">Nivel de incumplimiento: <b>${(100 - (s.si/s.n)*100).toFixed(0)}%</b>. Revisar procesos inmediatamente.</small>
+            <div class="hallazgo-item">
+                <div style="color:var(--danger); font-weight:bold; font-size:0.75em; margin-bottom:4px;">PRIORIDAD #${i+1}</div>
+                <div style="font-size:0.85em; line-height:1.3;">${s.t}</div>
+                <div style="margin-top:5px; font-size:0.75em; color:#777">Incumplimiento: <b>${(100 - (s.si/s.n)*100).toFixed(0)}%</b></div>
             </div>`).join('');
     }
 
@@ -194,14 +200,13 @@
             return `<div class="bar-container">
                 <div class="bar-label">${k}</div>
                 <div class="bar-bg"><div class="bar-fill" style="width:${p}%; background:var(--accent)"></div></div>
-                <div>${p.toFixed(1)}%</div>
+                <div>${p.toFixed(0)}%</div>
             </div>`;
         }).join('');
     }
 
     async function verDetalle(id, bNom, aNom) {
         const { data } = await _supabase.from('respuestas').select('*, configuracion_preguntas(pregunta, titulo)').eq('evaluacion_id', id);
-        
         const grupos = {};
         data.forEach(r => {
             const titulo = r.configuracion_preguntas?.titulo || 'GENERAL';
@@ -209,34 +214,28 @@
             grupos[titulo].push(r);
         });
 
-        document.getElementById('modal-titulo').innerText = `${bNom} | Auditor: ${aNom}`;
-        
+        document.getElementById('modal-titulo').innerText = `${bNom}`;
         let htmlFinal = '';
         for (const seccion in grupos) {
             htmlFinal += `<div class="seccion-header">${seccion}</div>`;
             htmlFinal += grupos[seccion].map(r => {
-                // Separar múltiples URLs de fotos
                 const fotos = r.foto_url ? r.foto_url.split(',') : [];
                 const galeriaHtml = fotos.length > 0 ? 
-                    `<div class="galeria-fotos">${fotos.map(url => `<img src="${url}" class="img-evidencia" onclick="window.open('${url}')">`).join('')}</div>` 
-                    : '<p style="color:#999; font-size:0.8em; margin-top:5px;">Sin fotos de evidencia</p>';
+                    `<div class="galeria-fotos">${fotos.map(url => `<img src="${url}" class="img-evidencia" onclick="window.open('${url}')">`).join('')}</div>` : '';
 
                 return `
                 <div class="pregunta-row">
-                    <div>
-                        <p style="margin:0; font-size:1em;"><strong>${r.configuracion_preguntas?.pregunta}</strong></p>
-                        <div style="margin:8px 0;">
-                            <span style="padding:3px 8px; border-radius:4px; font-weight:bold; font-size:0.75em; background:${r.cumple?'#e8f5e9':'#ffebee'}; color:${r.cumple?'var(--success)':'var(--danger)'}">
-                                ${r.cumple ? '✅ CUMPLE' : '❌ NO CUMPLE'}
-                            </span>
-                        </div>
-                        <p style="margin:0; font-size:0.85em; color:#666"><b>Obs:</b> ${r.observaciones || 'Sin observaciones'}</p>
+                    <p style="margin:0; font-size:0.9em;"><strong>${r.configuracion_preguntas?.pregunta}</strong></p>
+                    <div style="margin:5px 0; display:flex; align-items:center; gap:10px;">
+                        <span style="font-size:0.7em; font-weight:bold; color:${r.cumple?'var(--success)':'var(--danger)'}">
+                            ${r.cumple ? 'CUMPLE' : 'NO CUMPLE'}
+                        </span>
+                        <span style="font-size:0.75em; color:#666">${r.observaciones || ''}</span>
                     </div>
                     ${galeriaHtml}
                 </div>`;
             }).join('');
         }
-        
         document.getElementById('modal-body').innerHTML = htmlFinal;
         document.getElementById('modalDetalle').style.display = 'block';
     }
