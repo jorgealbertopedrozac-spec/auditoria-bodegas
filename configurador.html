@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurador - Auditoría Bodegas</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --primary: #2c3e50; --secondary: #27ae60; --danger: #e74c3c; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); padding: 20px; color: #333; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        h2 { color: var(--primary); border-bottom: 2px solid var(--secondary); padding-bottom: 10px; }
+        .grid-form { display: grid; grid-template-columns: 1fr 1fr 80px; gap: 15px; margin-bottom: 20px; }
+        .full-width { grid-column: span 3; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9em; }
+        input, textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        button { background: var(--secondary); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        .card-lista { margin-top: 30px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { text-align: left; padding: 15px; border-bottom: 1px solid #eee; }
+        th { background: #fafafa; color: var(--primary); }
+        .puntos { background: #ebf5fb; color: #2980b9; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+        .btn-del { background: var(--danger); padding: 8px; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>⚙️ Configuración de Evaluaciones</h2>
+    <p>Define las preguntas y el peso de cada una para la calificación final.</p>
+    
+    <div class="grid-form">
+        <div>
+            <label>Título (Sección)</label>
+            <input type="text" id="titulo" placeholder="Ej: Seguridad">
+        </div>
+        <div>
+            <label>Desglose (Sub-sección)</label>
+            <input type="text" id="desglose" placeholder="Ej: Extintores">
+        </div>
+        <div>
+            <label>Puntos</label>
+            <input type="number" id="ponderacion" value="10">
+        </div>
+        <div class="full-width">
+            <label>Pregunta Específica</label>
+            <textarea id="pregunta" rows="2" placeholder="¿Se encuentran los extintores con carga vigente?"></textarea>
+        </div>
+        <button class="full-width" onclick="guardarPregunta()">Añadir Pregunta al Catálogo</button>
+    </div>
+
+    <div class="card-lista">
+        <h3>Preguntas Registradas</h3>
+        <table id="tablaPreguntas">
+            <thead>
+                <tr>
+                    <th>Estructura</th>
+                    <th>Pregunta</th>
+                    <th>Peso</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // Configuración conectada a TU PROYECTO
+    const SUPABASE_URL = 'https://xjckzbegtvianurfvubp.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqY2t6YmVndHZpYW51cmZ2dWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxOTYzMzUsImV4cCI6MjA4Mjc3MjMzNX0.64zrKi0p1KiDwtBODLRf8O4sRvnn0o9QyoQUYHvVFd0';
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    async function cargarPreguntas() {
+        const { data, error } = await _supabase
+            .from('configuracion_preguntas')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error:', error);
+            return;
+        }
+
+        const tbody = document.querySelector('#tablaPreguntas tbody');
+        tbody.innerHTML = '';
+        
+        data.forEach(p => {
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${p.titulo}</strong><br><small style="color:gray">${p.desglose}</small></td>
+                    <td>${p.pregunta}</td>
+                    <td><span class="puntos">${p.ponderacion} pts</span></td>
+                    <td><button class="btn-del" onclick="eliminar('${p.id}')">Eliminar</button></td>
+                </tr>
+            `;
+        });
+    }
+
+    async function guardarPregunta() {
+        const titulo = document.getElementById('titulo').value;
+        const desglose = document.getElementById('desglose').value;
+        const pregunta = document.getElementById('pregunta').value;
+        const ponderacion = document.getElementById('ponderacion').value;
+
+        if(!titulo || !pregunta) return alert("Por favor completa los campos");
+
+        const { error } = await _supabase
+            .from('configuracion_preguntas')
+            .insert([{ 
+                titulo: titulo, 
+                desglose: desglose, 
+                pregunta: pregunta, 
+                ponderacion: parseFloat(ponderacion) 
+            }]);
+
+        if (error) {
+            alert("Error: Asegúrate de haber creado la tabla en Supabase.");
+            console.error(error);
+        } else {
+            // Limpiar campos
+            document.getElementById('titulo').value = '';
+            document.getElementById('desglose').value = '';
+            document.getElementById('pregunta').value = '';
+            cargarPreguntas();
+        }
+    }
+
+    async function eliminar(id) {
+        if(confirm("¿Eliminar esta pregunta?")) {
+            await _supabase.from('configuracion_preguntas').delete().eq('id', id);
+            cargarPreguntas();
+        }
+    }
+
+    cargarPreguntas();
+</script>
+</body>
+</html>
