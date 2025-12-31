@@ -3,50 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Análisis Maestro de Auditorías</title>
+    <title>Dashboard Maestro de Auditorías</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1250px; margin: auto; }
         
-        .btn-regresar { display: inline-block; margin-bottom: 15px; background: #fff; color: #2c3e50; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; border: 1px solid #ddd; }
+        .btn-regresar { display: inline-block; margin-bottom: 15px; background: #fff; color: var(--primary); padding: 8px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; border: 1px solid #ddd; transition: 0.3s; }
+        .btn-regresar:hover { background: #eee; }
 
         /* Filtros */
-        .filter-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .filter-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
         .filter-group label { display: block; font-size: 0.75rem; font-weight: bold; margin-bottom: 5px; color: #666; }
-        select, input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
+        select, input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; outline: none; }
 
         /* KPI y Plan de Acción */
-        .top-row { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-bottom: 20px; }
-        .action-plan-card { background: #fff4e5; border-left: 5px solid var(--warning); padding: 20px; border-radius: 12px; }
-
-        /* Resúmenes */
-        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .summary-card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .summary-card h4 { margin-top: 0; border-bottom: 2px solid var(--bg); padding-bottom: 10px; color: var(--primary); }
-        .summary-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f9f9f9; font-size: 0.9em; }
+        .top-row { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-bottom: 25px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .action-plan { background: #fff4e5; border-left: 5px solid var(--warning); padding: 20px; border-radius: 12px; }
+        .action-plan h3 { margin-top: 0; color: #856404; font-size: 1.1em; }
         
+        /* Resúmenes Gráficos */
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px; }
+        .summary-card h4 { margin: 0 0 15px 0; border-bottom: 2px solid #f4f7f6; padding-bottom: 10px; }
+        
+        .bar-container { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 0.85em; }
+        .bar-label { width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .bar-bg { flex: 1; background: #eee; height: 10px; border-radius: 5px; overflow: hidden; }
+        .bar-fill { height: 100%; transition: 0.8s ease-in-out; }
+
         /* Tabla */
-        .table-container { background: white; border-radius: 12px; overflow-x: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .table-container { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f8f9fa; color: #7f8c8d; font-size: 0.8em; }
+        th { background: #f8f9fa; padding: 12px; font-size: 0.8em; text-align: left; color: #7f8c8d; text-transform: uppercase; }
+        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 0.9em; }
+        tr:hover { background: #f1f8ff; cursor: pointer; }
 
-        .badge-score { padding: 4px 10px; border-radius: 15px; font-weight: bold; }
-        
         /* Modal */
-        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
-        .modal-content { background: white; margin: 2% auto; padding: 25px; width: 90%; max-width: 850px; border-radius: 15px; max-height: 90vh; overflow-y: auto; position: relative; }
-        .img-evidencia { width: 150px; height: 150px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid #eee; margin-top: 10px; transition: 0.3s; }
-        .img-evidencia:hover { transform: scale(1.05); }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); }
+        .modal-content { background: white; margin: 2% auto; padding: 25px; width: 90%; max-width: 850px; border-radius: 15px; max-height: 85vh; overflow-y: auto; }
+        .img-evidencia { width: 140px; height: 140px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #ddd; transition: 0.3s; }
+        .img-evidencia:hover { transform: scale(1.05); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
     </style>
 </head>
 <body>
 
 <div class="container">
     <a href="index.html" class="btn-regresar">🏠 Inicio</a>
-    <h2>📊 Dashboard de Calidad</h2>
+    <h2>📊 Inteligencia de Auditoría</h2>
 
     <div class="filter-card">
         <div class="filter-group"><label>👤 Auditor</label><select id="f-aud" onchange="aplicarFiltros()"><option value="">Todos</option></select></div>
@@ -58,20 +63,20 @@
     </div>
 
     <div class="top-row">
-        <div class="summary-card" style="text-align: center; display: flex; flex-direction: column; justify-content: center;">
-            <div id="kpi-general" style="font-size: 3em; font-weight: bold; color: var(--primary);">0%</div>
-            <div style="color: gray; font-size: 0.9em;">Cumplimiento General</div>
+        <div class="card" style="text-align: center; display: flex; flex-direction: column; justify-content: center;">
+            <div id="main-score" style="font-size: 3.5em; font-weight: bold; color: var(--primary);">0%</div>
+            <div style="color: gray; font-weight: bold;">CUMPLIMIENTO PROMEDIO</div>
         </div>
-        <div class="action-plan-card">
-            <h4 style="margin-top: 0; color: #856404;">⚠️ Plan de Acción Prioritario</h4>
-            <div id="plan-lista" style="font-size: 0.9em; line-height: 1.4;">Cargando hallazgos críticos...</div>
+        <div class="action-plan">
+            <h3>⚠️ Plan de Acción Sugerido</h3>
+            <div id="puntos-criticos">Cargando datos estratégicos...</div>
         </div>
     </div>
 
     <div class="summary-grid">
-        <div class="summary-card"><h4>📍 Por Ciudad</h4><div id="resumen-loc"></div></div>
-        <div class="summary-card"><h4>🏢 Por Depto</h4><div id="resumen-dep"></div></div>
-        <div class="summary-card"><h4>❓ Análisis de Procesos</h4><div id="resumen-preguntas"></div></div>
+        <div class="card summary-card"><h4>📍 Por Ciudad</h4><div id="res-loc"></div></div>
+        <div class="card summary-card"><h4>🏢 Por Departamento</h4><div id="res-dep"></div></div>
+        <div class="card summary-card"><h4>❓ Por Proceso (Preguntas)</h4><div id="res-pre"></div></div>
     </div>
 
     <div class="table-container">
@@ -84,8 +89,8 @@
 
 <div id="modalDetalle" class="modal">
     <div class="modal-content">
-        <span onclick="cerrarModal()" style="float:right; cursor:pointer; font-weight: bold; color: var(--danger);">✕ CERRAR</span>
-        <h3 id="modal-titulo"></h3>
+        <span onclick="cerrarModal()" style="float:right; cursor:pointer; font-weight:bold; color:var(--danger)">[ CERRAR ]</span>
+        <h3 id="modal-titulo">Detalle de Auditoría</h3>
         <hr>
         <div id="modal-body"></div>
     </div>
@@ -97,18 +102,18 @@
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     async function init() {
-        const hoy = new Date();
+        const h = new Date();
         const meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-        document.getElementById('f-mes').innerHTML = meses.map((m, i) => `<option value="${i}" ${i==hoy.getMonth()?'selected':''}>${m}</option>`).join('');
-        document.getElementById('f-anio').value = hoy.getFullYear();
+        document.getElementById('f-mes').innerHTML = meses.map((m,i)=>`<option value="${i}" ${i==h.getMonth()?'selected':''}>${m}</option>`).join('');
+        document.getElementById('f-anio').value = h.getFullYear();
 
         const { data: a } = await _supabase.from('auditores').select('*').order('nombre');
         const { data: b } = await _supabase.from('bodegas').select('*').order('localizacion');
 
-        document.getElementById('f-aud').innerHTML += a.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
-        document.getElementById('f-loc').innerHTML += [...new Set(b.map(x => x.localizacion))].map(x => `<option value="${x}">${x}</option>`).join('');
-        document.getElementById('f-dep').innerHTML += [...new Set(b.map(x => x.departamento))].map(x => `<option value="${x}">${x}</option>`).join('');
-        document.getElementById('f-bod').innerHTML += b.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
+        document.getElementById('f-aud').innerHTML += a.map(x=>`<option value="${x.id}">${x.nombre}</option>`).join('');
+        document.getElementById('f-loc').innerHTML += [...new Set(b.map(x=>x.localizacion))].map(x=>`<option value="${x}">${x}</option>`).join('');
+        document.getElementById('f-dep').innerHTML += [...new Set(b.map(x=>x.departamento))].map(x=>`<option value="${x}">${x}</option>`).join('');
+        document.getElementById('f-bod').innerHTML += b.map(x=>`<option value="${x.id}">${x.nombre}</option>`).join('');
 
         aplicarFiltros();
     }
@@ -116,113 +121,127 @@
     async function aplicarFiltros() {
         const m = parseInt(document.getElementById('f-mes').value);
         const y = parseInt(document.getElementById('f-anio').value);
-        const inicio = new Date(y, m, 1).toISOString();
+        const ini = new Date(y, m, 1).toISOString();
         const fin = new Date(y, m + 1, 0, 23, 59, 59).toISOString();
 
-        let q = _supabase.from('evaluaciones').select('*, bodegas!inner(*), auditores(nombre)').gte('fecha', inicio).lte('fecha', fin);
+        let q = _supabase.from('evaluaciones').select('*, bodegas!inner(*), auditores(nombre)').gte('fecha', ini).lte('fecha', fin);
         
-        if (document.getElementById('f-aud').value) q = q.eq('auditor_id', document.getElementById('f-aud').value);
-        if (document.getElementById('f-loc').value) q = q.eq('bodegas.localizacion', document.getElementById('f-loc').value);
-        if (document.getElementById('f-dep').value) q = q.eq('bodegas.departamento', document.getElementById('f-dep').value);
-        if (document.getElementById('f-bod').value) q = q.eq('bodega_id', document.getElementById('f-bod').value);
+        if(document.getElementById('f-aud').value) q = q.eq('auditor_id', document.getElementById('f-aud').value);
+        if(document.getElementById('f-loc').value) q = q.eq('bodegas.localizacion', document.getElementById('f-loc').value);
+        if(document.getElementById('f-dep').value) q = q.eq('bodegas.departamento', document.getElementById('f-dep').value);
+        if(document.getElementById('f-bod').value) q = q.eq('bodega_id', document.getElementById('f-bod').value);
 
-        const { data } = await q.order('fecha', { ascending: false });
-        procesarTodo(data);
+        const { data } = await q.order('fecha', {ascending: false});
+        renderDashboard(data);
     }
 
-    async function procesarTodo(data) {
-        if (!data || data.length === 0) {
-            document.getElementById('lista-evaluaciones').innerHTML = '<tr><td colspan="4">Sin datos</td></tr>';
+    async function renderDashboard(data) {
+        if(!data || data.length === 0) {
+            document.getElementById('lista-evaluaciones').innerHTML = '<tr><td colspan="4" style="text-align:center">Sin datos en este periodo</td></tr>';
             return;
         }
+        
+        // 1. Puntaje General
+        const avg = data.reduce((acc, v)=> acc + v.calificacion_final, 0) / data.length;
+        document.getElementById('main-score').innerText = avg.toFixed(1) + "%";
+        document.getElementById('main-score').style.color = avg >= 90 ? 'var(--success)' : (avg >= 80 ? 'var(--warning)' : 'var(--danger)');
 
-        // 1. Tabla y KPI
-        let sumaTotal = 0;
-        document.getElementById('lista-evaluaciones').innerHTML = data.map(ev => {
-            sumaTotal += ev.calificacion_final;
-            const c = ev.calificacion_final >= 90 ? 'var(--success)' : (ev.calificacion_final >= 80 ? 'var(--warning)' : 'var(--danger)');
-            return `<tr onclick="verDetalle('${ev.id}', '${ev.bodegas.nombre}', '${ev.auditores?.nombre}')">
+        // 2. Tabla
+        document.getElementById('lista-evaluaciones').innerHTML = data.map(ev => `
+            <tr onclick="verDetalle('${ev.id}', '${ev.bodegas.nombre}', '${ev.auditores?.nombre}')">
                 <td>${new Date(ev.fecha).toLocaleDateString()}</td>
                 <td>${ev.auditores?.nombre || 'N/A'}</td>
                 <td>${ev.bodegas.nombre}</td>
-                <td><span class="badge-score" style="background:${c}22; color:${c}">${ev.calificacion_final}%</span></td>
-            </tr>`;
-        }).join('');
-        
-        const promGral = (sumaTotal / data.length).toFixed(1);
-        document.getElementById('kpi-general').innerText = promGral + "%";
-        document.getElementById('kpi-general').style.color = promGral >= 90 ? 'var(--success)' : 'var(--danger)';
+                <td style="font-weight:bold; color:${ev.calificacion_final>=90?'var(--success)':'var(--danger)'}">${ev.calificacion_final}%</td>
+            </tr>`).join('');
 
-        // 2. Resúmenes de grupos
-        generarResumen(data, 'localizacion', 'resumen-loc');
-        generarResumen(data, 'departamento', 'resumen-dep');
-
-        // 3. Análisis de Preguntas (El "donde apretar")
+        // 3. Análisis de Preguntas y Plan de Acción
         const ids = data.map(x => x.id);
         const { data: resp } = await _supabase.from('respuestas').select('cumple, pregunta_id, configuracion_preguntas(pregunta)').in('evaluacion_id', ids);
         
         const pStats = {};
         resp.forEach(r => {
-            if(!pStats[r.pregunta_id]) pStats[r.pregunta_id] = { t: r.configuracion_preguntas.pregunta, si: 0, n: 0 };
+            if(!pStats[r.pregunta_id]) pStats[r.pregunta_id] = { t: r.configuracion_preguntas?.pregunta || 'Pregunta eliminada', si: 0, n: 0 };
             if(r.cumple) pStats[r.pregunta_id].si++;
             pStats[r.pregunta_id].n++;
         });
 
-        const sorted = Object.values(pStats).sort((a,b) => (a.si/a.n) - (b.si/b.n));
+        const sorted = Object.values(pStats).sort((a,b)=> (a.si/a.n) - (b.si/b.n));
 
-        // Render Análisis Preguntas (Barras)
-        document.getElementById('resumen-preguntas').innerHTML = sorted.slice(0, 5).map(s => {
+        // Render Barras
+        generarBarrasSimple(data, 'localizacion', 'res-loc');
+        generarBarrasSimple(data, 'departamento', 'res-dep');
+
+        // Render Barras Preguntas (Procesos)
+        document.getElementById('res-pre').innerHTML = sorted.slice(0, 5).map(s => {
             const p = (s.si/s.n)*100;
-            return `<div class="summary-item" style="flex-direction:column; align-items:flex-start;">
-                <div style="font-size:0.8em; margin-bottom:4px;">${s.t}</div>
-                <div style="width:100%; background:#eee; height:6px; border-radius:3px;">
-                    <div style="width:${p}%; background:${p>80?'var(--success)':'var(--danger)'}; height:100%; border-radius:3px;"></div>
-                </div>
+            const color = p >= 90 ? 'var(--success)' : (p >= 70 ? 'var(--warning)' : 'var(--danger)');
+            return `<div class="bar-container">
+                <div class="bar-label" title="${s.t}">${s.t}</div>
+                <div class="bar-bg"><div class="bar-fill" style="width:${p}%; background:${color}"></div></div>
+                <div style="width:35px; font-weight:bold;">${p.toFixed(0)}%</div>
             </div>`;
         }).join('');
 
-        // 4. Plan de Acción
-        document.getElementById('plan-lista').innerHTML = sorted.slice(0, 3).map((s, i) => 
-            `<div style="margin-bottom:8px;"><b>${i+1}.</b> ${s.t} (${((s.si/s.n)*100).toFixed(0)}% cumplimiento)</div>`
-        ).join('');
+        // Plan de Acción Sugerido
+        document.getElementById('puntos-criticos').innerHTML = sorted.slice(0, 3).map((s, i) => `
+            <div style="margin-bottom:10px;">
+                <strong>${i+1}. Revisar: ${s.t}</strong><br>
+                <small>Cumplimiento crítico: ${((s.si/s.n)*100).toFixed(1)}%. Se requiere intervención inmediata.</small>
+            </div>`).join('');
     }
 
-    function generarResumen(data, campo, id) {
+    function generarBarrasSimple(data, campo, id) {
         const g = {};
         data.forEach(ev => {
             const k = ev.bodegas[campo];
-            if (!g[k]) g[k] = { s: 0, n: 0 };
+            if(!g[k]) g[k] = { s:0, n:0 };
             g[k].s += ev.calificacion_final; g[k].n++;
         });
         document.getElementById(id).innerHTML = Object.keys(g).map(k => {
-            const p = (g[k].s / g[k].n).toFixed(1);
-            return `<div class="summary-item"><span>${k}</span><strong>${p}%</strong></div>`;
+            const p = g[k].s / g[k].n;
+            return `<div class="bar-container">
+                <div class="bar-label">${k}</div>
+                <div class="bar-bg"><div class="bar-fill" style="width:${p}%; background:var(--accent)"></div></div>
+                <div style="width:35px">${p.toFixed(1)}%</div>
+            </div>`;
         }).join('');
     }
 
     async function verDetalle(id, bNom, aNom) {
-        const { data } = await _supabase.from('respuestas').select('*, configuracion_preguntas(pregunta, titulo)').eq('evaluacion_id', id);
-        document.getElementById('modal-titulo').innerText = `${bNom} | Auditor: ${aNom}`;
+        const { data, error } = await _supabase
+            .from('respuestas')
+            .select('*, configuracion_preguntas(pregunta, titulo)')
+            .eq('evaluacion_id', id);
+
+        if(error) return console.error(error);
+
+        document.getElementById('modal-titulo').innerText = `${bNom} | Auditó: ${aNom}`;
         document.getElementById('modal-body').innerHTML = data.map(r => `
-            <div style="border-bottom:1px solid #eee; padding:15px 0; display: flex; gap: 20px; align-items: flex-start;">
-                <div style="flex: 1;">
-                    <p style="margin:0; font-weight:bold; color:var(--accent); font-size:0.8em;">${r.configuracion_preguntas.titulo}</p>
-                    <p style="margin:5px 0; font-size:1.1em;">${r.configuracion_preguntas.pregunta}</p>
-                    <p style="margin:0; font-weight: bold; color:${r.cumple ? 'var(--success)':'var(--danger)'}">
-                        ${r.cumple ? '✅ CUMPLE' : '❌ NO CUMPLE'}
+            <div style="border-bottom:1px solid #eee; padding:15px 0; display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 280px;">
+                    <p style="margin:0; font-weight:bold; color:var(--accent); font-size:0.8em; text-transform:uppercase;">${r.configuracion_preguntas?.titulo || 'Auditoría'}</p>
+                    <p style="margin:5px 0; font-size:1.05em;">${r.configuracion_preguntas?.pregunta}</p>
+                    <p style="margin:8px 0;">
+                        <span style="padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 0.8em; background: ${r.cumple ? '#e8f5e9' : '#ffebee'}; color: ${r.cumple ? 'var(--success)' : 'var(--danger)'}">
+                            ${r.cumple ? '✅ CONFORME' : '❌ NO CONFORME'}
+                        </span>
                     </p>
-                    <p style="margin:5px 0; font-style: italic; color: #666;">Nota: ${r.observaciones || 'Sin observaciones'}</p>
+                    <p style="margin:0; color:#666; font-size:0.9em;"><strong>Nota:</strong> ${r.observaciones || 'Sin observaciones'}</p>
                 </div>
-                ${r.foto_url ? `
-                    <div>
-                        <img src="${r.foto_url}" class="img-evidencia" onclick="window.open('${r.foto_url}')">
-                    </div>` : ''}
+                <div style="flex-shrink: 0;">
+                    ${r.foto_url 
+                        ? `<img src="${r.foto_url}" class="img-evidencia" onclick="window.open('${r.foto_url}', '_blank')" title="Ver en tamaño completo">` 
+                        : `<div style="width:140px; height:140px; border:1px dashed #ccc; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#999; font-size:0.8em;">Sin Foto</div>`
+                    }
+                </div>
             </div>`).join('');
         document.getElementById('modalDetalle').style.display = 'block';
     }
 
     function cerrarModal() { document.getElementById('modalDetalle').style.display = 'none'; }
     window.onclick = function(e) { if(e.target.className === 'modal') cerrarModal(); }
+
     init();
 </script>
 </body>
