@@ -30,15 +30,16 @@
         .bar-bg { flex: 1; background: #eee; height: 10px; border-radius: 5px; overflow: hidden; }
         .bar-fill { height: 100%; transition: 0.8s ease-in-out; }
 
-        /* Modal y Agrupación */
+        /* Modal y Galería de Fotos */
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); }
         .modal-content { background: white; margin: 2% auto; padding: 25px; width: 90%; max-width: 900px; border-radius: 15px; max-height: 85vh; overflow-y: auto; }
         
         .seccion-header { background: #f8f9fa; padding: 10px 15px; margin: 20px 0 10px 0; border-radius: 8px; color: var(--accent); font-weight: bold; text-transform: uppercase; font-size: 0.9em; border-left: 4px solid var(--accent); }
-        .pregunta-row { padding: 15px; border-bottom: 1px solid #f0f0f0; display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
-        .pregunta-row:last-child { border-bottom: none; }
+        .pregunta-row { padding: 15px; border-bottom: 1px solid #f0f0f0; display: flex; flex-direction: column; gap: 10px; }
         
-        .img-evidencia { width: 140px; height: 140px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #ddd; }
+        .galeria-fotos { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+        .img-evidencia { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #ddd; transition: 0.2s; }
+        .img-evidencia:hover { transform: scale(1.05); border-color: var(--accent); }
 
         /* Tabla Principal */
         .table-container { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
@@ -174,11 +175,10 @@
             </div>`;
         }).join('');
 
-        // Plan de Acción Mejorado
         document.getElementById('puntos-criticos').innerHTML = sorted.slice(0, 3).map((s, i) => `
             <div style="margin-bottom:12px; padding:10px; background:#fff; border-radius:8px;">
                 <span style="color:var(--danger); font-weight:bold;">#${i+1} FALLA PRIORITARIA:</span> ${s.t}<br>
-                <small style="color:#666">Nivel de incumplimiento: <b>${(100 - (s.si/s.n)*100).toFixed(0)}%</b> de las veces fallado en este filtro. Se requiere revisión de stock, limpieza o capacitación según corresponda.</small>
+                <small style="color:#666">Nivel de incumplimiento: <b>${(100 - (s.si/s.n)*100).toFixed(0)}%</b>. Revisar procesos inmediatamente.</small>
             </div>`).join('');
     }
 
@@ -202,7 +202,6 @@
     async function verDetalle(id, bNom, aNom) {
         const { data } = await _supabase.from('respuestas').select('*, configuracion_preguntas(pregunta, titulo)').eq('evaluacion_id', id);
         
-        // Agrupar por sección (Título)
         const grupos = {};
         data.forEach(r => {
             const titulo = r.configuracion_preguntas?.titulo || 'GENERAL';
@@ -215,20 +214,27 @@
         let htmlFinal = '';
         for (const seccion in grupos) {
             htmlFinal += `<div class="seccion-header">${seccion}</div>`;
-            htmlFinal += grupos[seccion].map(r => `
+            htmlFinal += grupos[seccion].map(r => {
+                // Separar múltiples URLs de fotos
+                const fotos = r.foto_url ? r.foto_url.split(',') : [];
+                const galeriaHtml = fotos.length > 0 ? 
+                    `<div class="galeria-fotos">${fotos.map(url => `<img src="${url}" class="img-evidencia" onclick="window.open('${url}')">`).join('')}</div>` 
+                    : '<p style="color:#999; font-size:0.8em; margin-top:5px;">Sin fotos de evidencia</p>';
+
+                return `
                 <div class="pregunta-row">
-                    <div style="flex: 1; min-width: 250px;">
-                        <p style="margin:0; font-size:1em;">${r.configuracion_preguntas?.pregunta}</p>
+                    <div>
+                        <p style="margin:0; font-size:1em;"><strong>${r.configuracion_preguntas?.pregunta}</strong></p>
                         <div style="margin:8px 0;">
                             <span style="padding:3px 8px; border-radius:4px; font-weight:bold; font-size:0.75em; background:${r.cumple?'#e8f5e9':'#ffebee'}; color:${r.cumple?'var(--success)':'var(--danger)'}">
-                                ${r.cumple ? 'CUMPLE' : 'NO CUMPLE'}
+                                ${r.cumple ? '✅ CUMPLE' : '❌ NO CUMPLE'}
                             </span>
                         </div>
                         <p style="margin:0; font-size:0.85em; color:#666"><b>Obs:</b> ${r.observaciones || 'Sin observaciones'}</p>
                     </div>
-                    ${r.foto_url ? `<div><img src="${r.foto_url}" class="img-evidencia" onclick="window.open('${r.foto_url}')"></div>` : ''}
-                </div>
-            `).join('');
+                    ${galeriaHtml}
+                </div>`;
+            }).join('');
         }
         
         document.getElementById('modal-body').innerHTML = htmlFinal;
