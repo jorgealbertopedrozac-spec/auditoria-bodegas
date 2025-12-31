@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluación de Bodega</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --primary: #2c3e50; --success: #27ae60; --danger: #e74c3c; --bg: #f0f2f5; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 10px; }
+        .container { max-width: 700px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        
+        h2 { text-align: center; color: var(--primary); margin-bottom: 25px; }
+        .seccion-titulo { background: var(--primary); color: white; padding: 10px 15px; border-radius: 8px; margin-top: 30px; font-size: 1.1em; }
+        .desglose-bloque { margin-left: 10px; border-left: 3px solid var(--success); padding-left: 15px; margin-top: 20px; }
+        .desglose-titulo { font-weight: bold; color: #444; margin-bottom: 10px; display: block; }
+        
+        .pregunta-card { background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #eee; }
+        .pregunta-texto { margin: 0 0 12px 0; font-size: 0.95em; line-height: 1.4; }
+        
+        .opciones { display: flex; gap: 10px; }
+        .radio-btn { flex: 1; }
+        .radio-btn input { display: none; }
+        .radio-btn label { 
+            display: block; text-align: center; padding: 8px; border: 2px solid #ddd; 
+            border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.8em; transition: 0.3s;
+        }
+        
+        /* Colores de selección */
+        .check-c:checked + label { background: var(--success); color: white; border-color: var(--success); }
+        .check-nc:checked + label { background: var(--danger); color: white; border-color: var(--danger); }
+
+        select { width: 100%; padding: 12px; border-radius: 8px; border: 2px solid #eee; font-size: 1em; margin-bottom: 20px; }
+        #btn-flotante { 
+            position: fixed; bottom: 20px; right: 20px; background: var(--success); 
+            color: white; border: none; padding: 15px 30px; border-radius: 50px; 
+            font-size: 1.1em; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📋 Evaluación de Bodega</h2>
+    
+    <label><strong>1. Selecciona la Bodega:</strong></label>
+    <select id="selectBodega"><option>Cargando...</option></select>
+
+    <div id="renderEvaluacion">
+        </div>
+
+    <button id="btn-flotante" onclick="enviarEvaluacion()">Guardar Evaluación</button>
+</div>
+
+<script>
+    const SUPABASE_URL = 'https://xjckzbegtvianurfvubp.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqY2t6YmVndHZpYW51cmZ2dWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxOTYzMzUsImV4cCI6MjA4Mjc3MjMzNX0.64zrKi0p1KiDwtBODLRf8O4sRvnn0o9QyoQUYHvVFd0';
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let preguntasGlobal = [];
+
+    async function init() {
+        // Cargar Bodegas
+        const { data: bodegas } = await _supabase.from('bodegas').select('*');
+        document.getElementById('selectBodega').innerHTML = bodegas.map(b => `<option value="${b.id}">${b.nombre}</option>`).join('');
+
+        // Cargar Preguntas
+        const { data: preguntas } = await _supabase.from('configuracion_preguntas').select('*').order('titulo', {ascending: true});
+        preguntasGlobal = preguntas;
+        renderizar(preguntas);
+    }
+
+    function renderizar(preguntas) {
+        const contenedor = document.getElementById('renderEvaluacion');
+        let html = '';
+        let ultimoTitulo = '';
+        let ultimoDesglose = '';
+
+        preguntas.forEach((p, i) => {
+            // Cambio de Sección (Título)
+            if (p.titulo !== ultimoTitulo) {
+                html += `<div class="seccion-titulo">${p.titulo}</div>`;
+                ultimoTitulo = p.titulo;
+            }
+
+            // Cambio de Sub-sección (Desglose)
+            if (p.desglose !== ultimoDesglose) {
+                html += `<div class="desglose-titulo" style="margin-top:15px; padding-left:10px;">📍 ${p.desglose}</div>`;
+                ultimoDesglose = p.desglose;
+            }
+
+            // Carta de Pregunta
+            html += `
+                <div class="pregunta-card">
+                    <p class="pregunta-texto">${p.pregunta}</p>
+                    <div class="opciones">
+                        <div class="radio-btn">
+                            <input type="radio" name="preg-${i}" id="c-${i}" class="check-c" value="true">
+                            <label for="c-${i}">CONFORME</label>
+                        </div>
+                        <div class="radio-btn">
+                            <input type="radio" name="preg-${i}" id="nc-${i}" class="check-nc" value="false">
+                            <label for="nc-${i}">NO CONFORME</label>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        contenedor.innerHTML = html;
+    }
+
+    async function enviarEvaluacion() {
+        const bodegaId = document.getElementById('selectBodega').value;
+        let puntosObtenidos = 0;
+        let puntosTotales = 0;
+        const respuestas = [];
+
+        preguntasGlobal.forEach((p, i) => {
+            const isC = document.getElementById(`c-${i}`).checked;
+            const isNC = document.getElementById(`nc-${i}`).checked;
+
+            if (isC || isNC) {
+                const pts = isC ? p.ponderacion : 0;
+                puntosObtenidos += pts;
+                puntosTotales += p.ponderacion;
+                respuestas.push({ pregunta_id: p.id, cumple: isC, puntos_obtenidos: pts });
+            }
+        });
+
+        if (respuestas.length < preguntasGlobal.length) {
+            alert("Faltan preguntas por contestar.");
+            return;
+        }
+
+        const score = (puntosObtenidos / puntosTotales) * 100;
+
+        const { data: ev, error } = await _supabase.from('evaluaciones').insert([
+            { bodega_id: bodegaId, calificacion_final: score.toFixed(2), tipo: 'Semanal' }
+        ]).select();
+
+        if (error) return alert("Error al guardar");
+
+        const detalleFinal = respuestas.map(r => ({ ...r, evaluacion_id: ev[0].id }));
+        await _supabase.from('respuestas').insert(detalleFinal);
+
+        alert("Evaluación Guardada: " + score.toFixed(2) + "%");
+        location.reload();
+    }
+
+    init();
+</script>
+</body>
+</html>
