@@ -3,41 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Evaluación Pro - Bodegas</title>
+    <title>Realizar Auditoría - Sistema de Bodegas</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --danger: #e74c3c; --bg: #f0f2f5; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 10px; padding-bottom: 80px; }
-        .container { max-width: 700px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .seccion-titulo { background: var(--primary); color: white; padding: 12px; border-radius: 8px; margin-top: 25px; font-weight: bold; }
-        .desglose-titulo { font-weight: bold; color: #555; margin: 15px 0 10px 10px; border-left: 4px solid var(--success); padding-left: 10px; }
-        .pregunta-card { background: #fff; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #ddd; }
-        .opciones { display: flex; gap: 10px; margin-bottom: 10px; }
+        :root { --primary: #2c3e50; --success: #27ae60; --danger: #e74c3c; --bg: #f0f2f5; --accent: #3498db; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 10px; padding-bottom: 90px; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        
+        h2 { text-align: center; color: var(--primary); }
+        .header-info { background: #fff; padding: 15px; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 20px; }
+        
+        .seccion-titulo { background: var(--primary); color: white; padding: 12px; border-radius: 8px; margin-top: 30px; font-weight: bold; text-transform: uppercase; font-size: 0.9em; }
+        .desglose-titulo { font-weight: bold; color: #555; margin: 20px 0 10px 10px; border-left: 4px solid var(--success); padding-left: 10px; font-size: 1.1em; }
+        
+        .pregunta-card { background: #fff; padding: 18px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #eee; transition: 0.3s; }
+        .pregunta-card:hover { border-color: var(--accent); }
+        
+        .opciones { display: flex; gap: 12px; margin: 15px 0; }
         .radio-btn { flex: 1; }
         .radio-btn input { display: none; }
-        .radio-btn label { display: block; text-align: center; padding: 10px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .radio-btn label { display: block; text-align: center; padding: 12px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.9em; }
+        
         .check-c:checked + label { background: var(--success); color: white; border-color: var(--success); }
         .check-nc:checked + label { background: var(--danger); color: white; border-color: var(--danger); }
+
+        .evidencia-box { background: #f8f9fa; padding: 12px; border-radius: 8px; border: 1px dashed #ccc; }
+        .input-obs { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 10px; box-sizing: border-box; }
+        .btn-foto { width: 100%; background: #546e7a; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px; }
         
-        /* Nuevos campos de evidencia */
-        .evidencia-panel { background: #f8f9fa; padding: 10px; border-radius: 8px; display: grid; gap: 10px; }
-        .input-obs { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .btn-foto { background: #607d8b; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 0.8em; }
-        
-        #btn-save { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; background: var(--success); color: white; border: none; padding: 15px; border-radius: 50px; font-size: 1.2em; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 100; }
+        #btn-finalizar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; background: var(--primary); color: white; border: none; padding: 18px; border-radius: 50px; font-size: 1.2em; font-weight: bold; cursor: pointer; box-shadow: 0 5px 20px rgba(0,0,0,0.3); z-index: 1000; }
+        #btn-finalizar:disabled { background: #95a5a6; cursor: not-allowed; }
+
+        select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 1em; background: #fff; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>📋 Auditoría de Almacén</h2>
-    <label>Bodega:</label>
-    <select id="selectBodega" style="width:100%; padding:10px; margin-bottom:20px;"></select>
+    <h2>📋 Formulario de Auditoría</h2>
+    
+    <div class="header-info">
+        <label><strong>Seleccionar Bodega:</strong></label>
+        <select id="selectBodega">
+            <option value="">Cargando bodegas...</option>
+        </select>
+    </div>
 
-    <div id="renderEvaluacion"></div>
+    <div id="renderArea">
+        </div>
 </div>
 
-<button id="btn-save" onclick="enviarEvaluacion()">Guardar Evaluación</button>
+<button id="btn-finalizar" onclick="enviarEvaluacion()">💾 Guardar Evaluación</button>
 
 <script>
     const SUPABASE_URL = 'https://xjckzbegtvianurfvubp.supabase.co';
@@ -47,49 +63,70 @@
     let preguntasGlobal = [];
 
     async function init() {
-        const { data: b } = await _supabase.from('bodegas').select('*');
-        document.getElementById('selectBodega').innerHTML = b.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
+        // 1. Cargar Bodegas con el nuevo formato
+        const { data: bodegas } = await _supabase.from('bodegas').select('*').order('localizacion');
+        const select = document.getElementById('selectBodega');
+        select.innerHTML = bodegas.map(b => `
+            <option value="${b.id}">${b.localizacion} | ${b.departamento} | ${b.nombre}</option>
+        `).join('');
 
-        const { data: p } = await _supabase.from('configuracion_preguntas').select('*').order('titulo');
-        preguntasGlobal = p;
-        renderizar(p);
+        // 2. Cargar Preguntas
+        const { data: preguntas } = await _supabase.from('configuracion_preguntas').select('*').order('titulo', {ascending: true});
+        preguntasGlobal = preguntas;
+        renderizarAuditoria(preguntas);
     }
 
-    function renderizar(preguntas) {
-        const div = document.getElementById('renderEvaluacion');
-        let html = '', uT = '', uD = '';
+    function renderizarAuditoria(preguntas) {
+        const area = document.getElementById('renderArea');
+        let html = '', uTit = '', uDes = '';
 
         preguntas.forEach((p, i) => {
-            if (p.titulo !== uT) { html += `<div class="seccion-titulo">${p.titulo}</div>`; uT = p.titulo; }
-            if (p.desglose !== uD) { html += `<div class="desglose-titulo">${p.desglose}</div>`; uD = p.desglose; }
+            if (p.titulo !== uTit) {
+                html += `<div class="seccion-titulo">${p.titulo}</div>`;
+                uTit = p.titulo;
+            }
+            if (p.desglose !== uDes) {
+                html += `<div class="desglose-titulo">📍 ${p.desglose}</div>`;
+                uDes = p.desglose;
+            }
 
             html += `
-                <div class="pregunta-card" id="card-${i}">
-                    <p><strong>${p.pregunta}</strong></p>
+                <div class="pregunta-card">
+                    <p style="margin-top:0;">${p.pregunta}</p>
                     <div class="opciones">
-                        <div class="radio-btn"><input type="radio" name="r-${i}" id="c-${i}" class="check-c"><label for="c-${i}">CONFORME</label></div>
-                        <div class="radio-btn"><input type="radio" name="r-${i}" id="nc-${i}" class="check-nc"><label for="nc-${i}">NO CONFORME</label></div>
+                        <div class="radio-btn">
+                            <input type="radio" name="opt-${i}" id="c-${i}" class="check-c">
+                            <label for="c-${i}">CONFORME</label>
+                        </div>
+                        <div class="radio-btn">
+                            <input type="radio" name="opt-${i}" id="nc-${i}" class="check-nc">
+                            <label for="nc-${i}">NO CONFORME</label>
+                        </div>
                     </div>
-                    <div class="evidencia-panel">
-                        <input type="text" id="obs-${i}" class="input-obs" placeholder="Observaciones o hallazgos...">
-                        <input type="file" id="file-${i}" accept="image/*" capture="camera" style="display:none" onchange="actualizarBoton(${i})">
-                        <button class="btn-foto" id="btn-foto-${i}" onclick="document.getElementById('file-${i}').click()">📷 Adjuntar Foto</button>
+                    <div class="evidencia-box">
+                        <input type="text" id="obs-${i}" class="input-obs" placeholder="Agregar nota u observación...">
+                        <input type="file" id="file-${i}" accept="image/*" capture="camera" style="display:none" onchange="marcarSubida(${i})">
+                        <button class="btn-foto" id="btn-foto-${i}" onclick="document.getElementById('file-${i}').click()">
+                            📷 <span id="txt-foto-${i}">Adjuntar Foto Evidencia</span>
+                        </button>
                     </div>
-                </div>`;
+                </div>
+            `;
         });
-        div.innerHTML = html;
+        area.innerHTML = html;
     }
 
-    function actualizarBoton(i) {
-        document.getElementById(`btn-foto-${i}`).innerText = "✅ Foto lista";
-        document.getElementById(`btn-foto-${i}`).style.background = "#455a64";
+    function marcarSubida(i) {
+        document.getElementById(`txt-foto-${i}`).innerText = "✓ Foto capturada";
+        document.getElementById(`btn-foto-${i}`).style.background = "#2c3e50";
     }
 
     async function enviarEvaluacion() {
         const bodegaId = document.getElementById('selectBodega').value;
-        const btnSave = document.getElementById('btn-save');
-        btnSave.innerText = "Subiendo datos...";
-        btnSave.disabled = true;
+        const btn = document.getElementById('btn-finalizar');
+        
+        btn.innerText = "⏳ Procesando y Subiendo Fotos...";
+        btn.disabled = true;
 
         let pObt = 0, pTot = 0, respuestas = [];
 
@@ -105,17 +142,17 @@
 
                 let fotoUrl = null;
                 if (file) {
-                    const fileName = `${Date.now()}_${i}.jpg`;
-                    const { data } = await _supabase.storage.from('evidencias').upload(fileName, file);
-                    if (data) {
-                        const { data: publicUrl } = _supabase.storage.from('evidencias').getPublicUrl(fileName);
-                        fotoUrl = publicUrl.publicUrl;
+                    const path = `eval_${Date.now()}_${i}.jpg`;
+                    const { data: upData } = await _supabase.storage.from('evidencias').upload(path, file);
+                    if (upData) {
+                        const { data: pub } = _supabase.storage.from('evidencias').getPublicUrl(path);
+                        fotoUrl = pub.publicUrl;
                     }
                 }
 
-                respuestas.push({ 
-                    pregunta_id: preguntasGlobal[i].id, 
-                    cumple: isC, 
+                respuestas.push({
+                    pregunta_id: preguntasGlobal[i].id,
+                    cumple: isC,
                     puntos_obtenidos: pts,
                     observaciones: obs,
                     foto_url: fotoUrl
@@ -124,20 +161,28 @@
         }
 
         if (respuestas.length < preguntasGlobal.length) {
-            alert("Responde todas las preguntas");
-            btnSave.disabled = false; btnSave.innerText = "Guardar Evaluación";
+            alert("⚠️ Debes contestar todas las preguntas.");
+            btn.disabled = false; btn.innerText = "💾 Guardar Evaluación";
             return;
         }
 
         const score = (pObt / pTot) * 100;
-        const { data: ev } = await _supabase.from('evaluaciones').insert([{ 
-            bodega_id: bodegaId, calificacion_final: score.toFixed(2) 
+
+        // Guardar Cabecera
+        const { data: evData, error: evErr } = await _supabase.from('evaluaciones').insert([{
+            bodega_id: bodegaId, calificacion_final: score.toFixed(2)
         }]).select();
 
-        const finalR = respuestas.map(r => ({ ...r, evaluacion_id: ev[0].id }));
+        if (evErr) {
+            alert("Error al conectar con la base de datos.");
+            btn.disabled = false; return;
+        }
+
+        // Guardar Detalles
+        const finalR = respuestas.map(r => ({ ...r, evaluacion_id: evData[0].id }));
         await _supabase.from('respuestas').insert(finalR);
 
-        alert("Evaluación exitosa: " + score.toFixed(2) + "%");
+        alert(`✅ ÉXITO: Calificación Final ${score.toFixed(2)}%`);
         location.reload();
     }
 
