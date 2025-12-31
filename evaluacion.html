@@ -3,54 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Evaluación de Bodega</title>
+    <title>Evaluación Pro - Bodegas</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --danger: #e74c3c; --bg: #f0f2f5; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 10px; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 10px; padding-bottom: 80px; }
         .container { max-width: 700px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        
-        h2 { text-align: center; color: var(--primary); margin-bottom: 25px; }
-        .seccion-titulo { background: var(--primary); color: white; padding: 10px 15px; border-radius: 8px; margin-top: 30px; font-size: 1.1em; }
-        .desglose-bloque { margin-left: 10px; border-left: 3px solid var(--success); padding-left: 15px; margin-top: 20px; }
-        .desglose-titulo { font-weight: bold; color: #444; margin-bottom: 10px; display: block; }
-        
-        .pregunta-card { background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #eee; }
-        .pregunta-texto { margin: 0 0 12px 0; font-size: 0.95em; line-height: 1.4; }
-        
-        .opciones { display: flex; gap: 10px; }
+        .seccion-titulo { background: var(--primary); color: white; padding: 12px; border-radius: 8px; margin-top: 25px; font-weight: bold; }
+        .desglose-titulo { font-weight: bold; color: #555; margin: 15px 0 10px 10px; border-left: 4px solid var(--success); padding-left: 10px; }
+        .pregunta-card { background: #fff; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #ddd; }
+        .opciones { display: flex; gap: 10px; margin-bottom: 10px; }
         .radio-btn { flex: 1; }
         .radio-btn input { display: none; }
-        .radio-btn label { 
-            display: block; text-align: center; padding: 8px; border: 2px solid #ddd; 
-            border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.8em; transition: 0.3s;
-        }
-        
-        /* Colores de selección */
+        .radio-btn label { display: block; text-align: center; padding: 10px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; font-weight: bold; }
         .check-c:checked + label { background: var(--success); color: white; border-color: var(--success); }
         .check-nc:checked + label { background: var(--danger); color: white; border-color: var(--danger); }
-
-        select { width: 100%; padding: 12px; border-radius: 8px; border: 2px solid #eee; font-size: 1em; margin-bottom: 20px; }
-        #btn-flotante { 
-            position: fixed; bottom: 20px; right: 20px; background: var(--success); 
-            color: white; border: none; padding: 15px 30px; border-radius: 50px; 
-            font-size: 1.1em; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        }
+        
+        /* Nuevos campos de evidencia */
+        .evidencia-panel { background: #f8f9fa; padding: 10px; border-radius: 8px; display: grid; gap: 10px; }
+        .input-obs { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .btn-foto { background: #607d8b; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 0.8em; }
+        
+        #btn-save { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; background: var(--success); color: white; border: none; padding: 15px; border-radius: 50px; font-size: 1.2em; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 100; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>📋 Evaluación de Bodega</h2>
-    
-    <label><strong>1. Selecciona la Bodega:</strong></label>
-    <select id="selectBodega"><option>Cargando...</option></select>
+    <h2>📋 Auditoría de Almacén</h2>
+    <label>Bodega:</label>
+    <select id="selectBodega" style="width:100%; padding:10px; margin-bottom:20px;"></select>
 
-    <div id="renderEvaluacion">
-        </div>
-
-    <button id="btn-flotante" onclick="enviarEvaluacion()">Guardar Evaluación</button>
+    <div id="renderEvaluacion"></div>
 </div>
+
+<button id="btn-save" onclick="enviarEvaluacion()">Guardar Evaluación</button>
 
 <script>
     const SUPABASE_URL = 'https://xjckzbegtvianurfvubp.supabase.co';
@@ -60,90 +47,97 @@
     let preguntasGlobal = [];
 
     async function init() {
-        // Cargar Bodegas
-        const { data: bodegas } = await _supabase.from('bodegas').select('*');
-        document.getElementById('selectBodega').innerHTML = bodegas.map(b => `<option value="${b.id}">${b.nombre}</option>`).join('');
+        const { data: b } = await _supabase.from('bodegas').select('*');
+        document.getElementById('selectBodega').innerHTML = b.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
 
-        // Cargar Preguntas
-        const { data: preguntas } = await _supabase.from('configuracion_preguntas').select('*').order('titulo', {ascending: true});
-        preguntasGlobal = preguntas;
-        renderizar(preguntas);
+        const { data: p } = await _supabase.from('configuracion_preguntas').select('*').order('titulo');
+        preguntasGlobal = p;
+        renderizar(p);
     }
 
     function renderizar(preguntas) {
-        const contenedor = document.getElementById('renderEvaluacion');
-        let html = '';
-        let ultimoTitulo = '';
-        let ultimoDesglose = '';
+        const div = document.getElementById('renderEvaluacion');
+        let html = '', uT = '', uD = '';
 
         preguntas.forEach((p, i) => {
-            // Cambio de Sección (Título)
-            if (p.titulo !== ultimoTitulo) {
-                html += `<div class="seccion-titulo">${p.titulo}</div>`;
-                ultimoTitulo = p.titulo;
-            }
+            if (p.titulo !== uT) { html += `<div class="seccion-titulo">${p.titulo}</div>`; uT = p.titulo; }
+            if (p.desglose !== uD) { html += `<div class="desglose-titulo">${p.desglose}</div>`; uD = p.desglose; }
 
-            // Cambio de Sub-sección (Desglose)
-            if (p.desglose !== ultimoDesglose) {
-                html += `<div class="desglose-titulo" style="margin-top:15px; padding-left:10px;">📍 ${p.desglose}</div>`;
-                ultimoDesglose = p.desglose;
-            }
-
-            // Carta de Pregunta
             html += `
-                <div class="pregunta-card">
-                    <p class="pregunta-texto">${p.pregunta}</p>
+                <div class="pregunta-card" id="card-${i}">
+                    <p><strong>${p.pregunta}</strong></p>
                     <div class="opciones">
-                        <div class="radio-btn">
-                            <input type="radio" name="preg-${i}" id="c-${i}" class="check-c" value="true">
-                            <label for="c-${i}">CONFORME</label>
-                        </div>
-                        <div class="radio-btn">
-                            <input type="radio" name="preg-${i}" id="nc-${i}" class="check-nc" value="false">
-                            <label for="nc-${i}">NO CONFORME</label>
-                        </div>
+                        <div class="radio-btn"><input type="radio" name="r-${i}" id="c-${i}" class="check-c"><label for="c-${i}">CONFORME</label></div>
+                        <div class="radio-btn"><input type="radio" name="r-${i}" id="nc-${i}" class="check-nc"><label for="nc-${i}">NO CONFORME</label></div>
                     </div>
-                </div>
-            `;
+                    <div class="evidencia-panel">
+                        <input type="text" id="obs-${i}" class="input-obs" placeholder="Observaciones o hallazgos...">
+                        <input type="file" id="file-${i}" accept="image/*" capture="camera" style="display:none" onchange="actualizarBoton(${i})">
+                        <button class="btn-foto" id="btn-foto-${i}" onclick="document.getElementById('file-${i}').click()">📷 Adjuntar Foto</button>
+                    </div>
+                </div>`;
         });
-        contenedor.innerHTML = html;
+        div.innerHTML = html;
+    }
+
+    function actualizarBoton(i) {
+        document.getElementById(`btn-foto-${i}`).innerText = "✅ Foto lista";
+        document.getElementById(`btn-foto-${i}`).style.background = "#455a64";
     }
 
     async function enviarEvaluacion() {
         const bodegaId = document.getElementById('selectBodega').value;
-        let puntosObtenidos = 0;
-        let puntosTotales = 0;
-        const respuestas = [];
+        const btnSave = document.getElementById('btn-save');
+        btnSave.innerText = "Subiendo datos...";
+        btnSave.disabled = true;
 
-        preguntasGlobal.forEach((p, i) => {
+        let pObt = 0, pTot = 0, respuestas = [];
+
+        for (let i = 0; i < preguntasGlobal.length; i++) {
             const isC = document.getElementById(`c-${i}`).checked;
             const isNC = document.getElementById(`nc-${i}`).checked;
+            const obs = document.getElementById(`obs-${i}`).value;
+            const file = document.getElementById(`file-${i}`).files[0];
 
             if (isC || isNC) {
-                const pts = isC ? p.ponderacion : 0;
-                puntosObtenidos += pts;
-                puntosTotales += p.ponderacion;
-                respuestas.push({ pregunta_id: p.id, cumple: isC, puntos_obtenidos: pts });
+                const pts = isC ? preguntasGlobal[i].ponderacion : 0;
+                pObt += pts; pTot += preguntasGlobal[i].ponderacion;
+
+                let fotoUrl = null;
+                if (file) {
+                    const fileName = `${Date.now()}_${i}.jpg`;
+                    const { data } = await _supabase.storage.from('evidencias').upload(fileName, file);
+                    if (data) {
+                        const { data: publicUrl } = _supabase.storage.from('evidencias').getPublicUrl(fileName);
+                        fotoUrl = publicUrl.publicUrl;
+                    }
+                }
+
+                respuestas.push({ 
+                    pregunta_id: preguntasGlobal[i].id, 
+                    cumple: isC, 
+                    puntos_obtenidos: pts,
+                    observaciones: obs,
+                    foto_url: fotoUrl
+                });
             }
-        });
+        }
 
         if (respuestas.length < preguntasGlobal.length) {
-            alert("Faltan preguntas por contestar.");
+            alert("Responde todas las preguntas");
+            btnSave.disabled = false; btnSave.innerText = "Guardar Evaluación";
             return;
         }
 
-        const score = (puntosObtenidos / puntosTotales) * 100;
+        const score = (pObt / pTot) * 100;
+        const { data: ev } = await _supabase.from('evaluaciones').insert([{ 
+            bodega_id: bodegaId, calificacion_final: score.toFixed(2) 
+        }]).select();
 
-        const { data: ev, error } = await _supabase.from('evaluaciones').insert([
-            { bodega_id: bodegaId, calificacion_final: score.toFixed(2), tipo: 'Semanal' }
-        ]).select();
+        const finalR = respuestas.map(r => ({ ...r, evaluacion_id: ev[0].id }));
+        await _supabase.from('respuestas').insert(finalR);
 
-        if (error) return alert("Error al guardar");
-
-        const detalleFinal = respuestas.map(r => ({ ...r, evaluacion_id: ev[0].id }));
-        await _supabase.from('respuestas').insert(detalleFinal);
-
-        alert("Evaluación Guardada: " + score.toFixed(2) + "%");
+        alert("Evaluación exitosa: " + score.toFixed(2) + "%");
         location.reload();
     }
 
