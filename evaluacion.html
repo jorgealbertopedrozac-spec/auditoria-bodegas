@@ -24,11 +24,14 @@
         .input-obs { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 10px; box-sizing: border-box; }
         .btn-foto { width: 100%; background: #546e7a; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px; }
         
-        /* Estilos para miniaturas */
-        .preview-fotos { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; }
-        .thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; }
+        /* Estilos para miniaturas con botón eliminar */
+        .preview-fotos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .thumb-container { position: relative; width: 70px; height: 70px; }
+        .thumb { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
+        .btn-del-foto { position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 14px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 5; }
 
         #btn-finalizar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; background: var(--primary); color: white; border: none; padding: 18px; border-radius: 50px; font-size: 1.2em; font-weight: bold; cursor: pointer; box-shadow: 0 5px 20px rgba(0,0,0,0.3); z-index: 1000; }
+        #btn-finalizar:disabled { background: #95a5a6; cursor: not-allowed; }
         select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 1em; background: #fff; margin-top: 5px; }
         .btn-regresar { display: inline-block; margin-bottom: 15px; background: #ecf0f1; color: #2c3e50; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.85em; border: 1px solid #ddd; }
     </style>
@@ -65,6 +68,7 @@
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let preguntasGlobal = [];
+    let archivosAcumulados = {}; // Memoria para fotos por pregunta
 
     async function init() {
         const { data: auditores } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
@@ -109,8 +113,8 @@
                     </div>
                     <div class="evidencia-box">
                         <input type="text" id="obs-${i}" class="input-obs" placeholder="Agregar nota u observación...">
-                        <input type="file" id="file-${i}" accept="image/*" multiple onchange="previsualizar(${i})" style="display:none">
-                        <button class="btn-foto" id="btn-foto-${i}" onclick="document.getElementById('file-${i}').click()">
+                        <input type="file" id="file-${i}" accept="image/*" multiple onchange="manejarSeleccion(${i})" style="display:none">
+                        <button class="btn-foto" onclick="document.getElementById('file-${i}').click()">
                             📷 <span id="txt-foto-${i}">Adjuntar Fotos Evidencia</span>
                         </button>
                         <div id="preview-${i}" class="preview-fotos"></div>
@@ -121,25 +125,44 @@
         area.innerHTML = html;
     }
 
-    function previsualizar(i) {
+    function manejarSeleccion(i) {
         const input = document.getElementById(`file-${i}`);
-        const preview = document.getElementById(`preview-${i}`);
-        const txt = document.getElementById(`txt-foto-${i}`);
-        preview.innerHTML = "";
+        const nuevos = Array.from(input.files);
+        if (!archivosAcumulados[i]) archivosAcumulados[i] = [];
         
-        if (input.files.length > 0) {
-            txt.innerText = `✓ ${input.files.length} Fotos seleccionadas`;
-            Array.from(input.files).forEach(file => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = document.createElement("img");
-                    img.src = e.target.result;
-                    img.className = "thumb";
-                    preview.appendChild(img);
-                }
-                reader.readAsDataURL(file);
-            });
-        }
+        // Sumar archivos nuevos a la memoria
+        archivosAcumulados[i] = [...archivosAcumulados[i], ...nuevos];
+        input.value = ""; // Limpiar input para permitir repetir archivos
+        
+        actualizarVistaPrevia(i);
+    }
+
+    function actualizarVistaPrevia(i) {
+        const div = document.getElementById(`preview-${i}`);
+        const txt = document.getElementById(`txt-foto-${i}`);
+        div.innerHTML = "";
+        
+        const lista = archivosAcumulados[i] || [];
+        txt.innerText = lista.length > 0 ? `✓ ${lista.length} Fotos preparadas` : "Adjuntar Fotos Evidencia";
+
+        lista.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const container = document.createElement("div");
+                container.className = "thumb-container";
+                container.innerHTML = `
+                    <img src="${e.target.result}" class="thumb">
+                    <button class="btn-del-foto" onclick="borrarFoto(${i}, ${index})">×</button>
+                `;
+                div.appendChild(container);
+            }
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function borrarFoto(preguntaIdx, fotoIdx) {
+        archivosAcumulados[preguntaIdx].splice(fotoIdx, 1);
+        actualizarVistaPrevia(preguntaIdx);
     }
 
     async function enviarEvaluacion() {
@@ -161,17 +184,16 @@
             const isC = document.getElementById(`c-${i}`).checked;
             const isNC = document.getElementById(`nc-${i}`).checked;
             const obs = document.getElementById(`obs-${i}`).value;
-            const files = document.getElementById(`file-${i}`).files;
+            const fotosParaSubir = archivosAcumulados[i] || [];
 
             if (isC || isNC) {
                 const pts = isC ? preguntasGlobal[i].ponderacion : 0;
                 pObt += pts; pTot += preguntasGlobal[i].ponderacion;
 
                 let urlsArray = [];
-                // Subir múltiples fotos
-                for (let f = 0; f < files.length; f++) {
-                    const file = files[f];
-                    const path = `eval_${Date.now()}_p${i}_f${f}.jpg`;
+                for (let f = 0; f < fotosParaSubir.length; f++) {
+                    const file = fotosParaSubir[f];
+                    const path = `ev_${Date.now()}_p${i}_f${f}.jpg`;
                     const { data: upData } = await _supabase.storage.from('evidencias').upload(path, file);
                     if (upData) {
                         const { data: pub } = _supabase.storage.from('evidencias').getPublicUrl(path);
@@ -184,7 +206,6 @@
                     cumple: isC,
                     puntos_obtenidos: pts,
                     observaciones: obs,
-                    // Guardamos las URLs como un string separado por comas
                     foto_url: urlsArray.length > 0 ? urlsArray.join(',') : null 
                 });
             }
@@ -204,6 +225,7 @@
 
         if (evErr) {
             btn.disabled = false;
+            btn.innerText = "💾 Guardar Evaluación";
             return alert("Error al guardar evaluación.");
         }
 
