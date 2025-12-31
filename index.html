@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Auditoría de Bodegas</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --accent: #27ae60;
+            --bg: #f4f7f6;
+            --text: #34495e;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: var(--text);
+        }
+
+        .menu-container {
+            width: 90%;
+            max-width: 450px;
+            text-align: center;
+        }
+
+        .header {
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            color: var(--primary);
+        }
+
+        .header p {
+            color: #7f8c8d;
+            margin-top: 10px;
+        }
+
+        .nav-grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .nav-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-decoration: none;
+            color: var(--primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid #eee;
+        }
+
+        .nav-card:active {
+            transform: scale(0.96);
+            background: #f9f9f9;
+        }
+
+        .icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .nav-card h3 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .nav-card p {
+            margin: 5px 0 0 0;
+            font-size: 0.85rem;
+            color: #95a5a6;
+        }
+
+        .footer {
+            margin-top: 40px;
+            font-size: 0.8rem;
+            color: #bdc3c7;
+        }
+
+        /* Colores distintivos por sección */
+        .card-eval { border-left: 6px solid var(--accent); }
+        .card-hist { border-left: 6px solid var(--secondary); }
+        .card-conf { border-left: 6px solid #f39c12; }
+    </style>
+</head>
+<body>
+
+    <div class="menu-container">
+        <div class="header">
+            <h1>Auditoría de Bodegas</h1>
+            <p>Panel de Gestión de Calidad</p>
+        </div>
+
+        <div class="nav-grid">
+            <a href="evaluacion.html" class="nav-card card-eval">
+                <span class="icon">📝</span>
+                <h3>Nueva Evaluación</h3>
+                <p>Iniciar checklist semanal o extraordinario</p>
+            </a>
+
+            <a href="historial.html" class="nav-card card-hist">
+                <span class="icon">📊</span>
+                <h3>Historial y Métricas</h3>
+                <p>Ver reportes, fotos y promedios mensuales</p>
+            </a>
+
+            <a href="configurador.html" class="nav-card card-conf">
+                <span class="icon">⚙️</span>
+                <h3>Configuración</h3>
+                <p>Administrar bodegas y catálogo de preguntas</p>
+            </a>
+        </div>
+
+        <div class="footer">
+            Sistema Conectado a Supabase Cloud
+        </div>
+    </div>
+
+</body>
+</html>
