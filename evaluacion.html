@@ -11,7 +11,29 @@
         .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         h2 { text-align: center; color: var(--primary); margin-top: 10px; }
         .header-info { background: #fff; padding: 15px; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 20px; }
-        .seccion-titulo { background: var(--primary); color: white; padding: 12px; border-radius: 8px; margin-top: 30px; font-weight: bold; text-transform: uppercase; font-size: 0.9em; }
+        
+        /* Título Colapsable */
+        .seccion-titulo { 
+            background: var(--primary); 
+            color: white; 
+            padding: 12px; 
+            border-radius: 8px; 
+            margin-top: 20px; 
+            font-weight: bold; 
+            text-transform: uppercase; 
+            font-size: 0.9em; 
+            cursor: pointer; 
+            display: flex; 
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        .seccion-titulo:hover { background: #34495e; }
+        
+        /* Contenedor del contenido de la sección */
+        .seccion-contenido { display: block; }
+        .seccion-contenido.hidden { display: none; }
+
         .desglose-titulo { font-weight: bold; color: #555; margin: 20px 0 10px 10px; border-left: 4px solid var(--success); padding-left: 10px; font-size: 1.1em; }
         .pregunta-card { background: #fff; padding: 18px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #eee; transition: 0.3s; }
         .opciones { display: flex; gap: 12px; margin: 15px 0; }
@@ -74,30 +96,45 @@
         document.getElementById('selectAuditor').innerHTML = '<option value="">Selecciona Auditor...</option>' + auditores.map(a => `<option value="${a.id}">${a.nombre}</option>`).join('');
 
         const { data: bodegas } = await _supabase.from('bodegas').select('*').order('localizacion');
-        document.getElementById('selectBodega').innerHTML = '<option value="">Selecciona Bodega...</option>' + bodegas.map(b => `<option value="${b.id}">${b.localizacion} | ${b.departamento} | ${b.nombre}</option>`).join('');
+        document.getElementById('selectBodega').innerHTML = '<option value="">Selecciona Bodega...</option>' + bodegas.map(b => `<option value="${b.id}">${b.localizacion} | ${b.nombre}</option>`).join('');
 
-        // CORRECCIÓN DE ORDENAMIENTO:
         const { data: preguntas } = await _supabase.from('configuracion_preguntas').select('*');
-        
-        // Ordenamos mediante JavaScript usando "Natural Sort"
-        // Esto hará que 1.1 vaya antes que 1.7 y 1.10 vaya después que 1.9
-        preguntas.sort((a, b) => {
-            return a.desglose.localeCompare(b.desglose, undefined, { numeric: true, sensitivity: 'base' });
-        });
+        preguntas.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true, sensitivity: 'base' }));
 
         preguntasGlobal = preguntas;
         renderizarAuditoria(preguntas);
     }
 
+    function toggleSeccion(index) {
+        const content = document.getElementById(`seccion-content-${index}`);
+        const icon = document.getElementById(`icon-${index}`);
+        if (content.classList.contains('hidden')) {
+            content.classList.remove('hidden');
+            icon.innerText = "🔼";
+        } else {
+            content.classList.add('hidden');
+            icon.innerText = "🔽";
+        }
+    }
+
     function renderizarAuditoria(preguntas) {
         const area = document.getElementById('renderArea');
-        let html = '', uTit = '', uDes = '';
+        let html = '', uTit = '', uDes = '', seccionIndex = -1;
 
         preguntas.forEach((p, i) => {
             if (p.titulo !== uTit) {
-                html += `<div class="seccion-titulo">${p.titulo}</div>`;
+                if (seccionIndex !== -1) html += `</div>`; // Cierra contenedor anterior
+                seccionIndex++;
+                html += `
+                    <div class="seccion-titulo" onclick="toggleSeccion(${seccionIndex})">
+                        <span>${p.titulo}</span>
+                        <span id="icon-${seccionIndex}">🔼</span>
+                    </div>
+                    <div id="seccion-content-${seccionIndex}" class="seccion-contenido">`;
                 uTit = p.titulo;
+                uDes = ''; // Reset para forzar el desglose en nueva sección
             }
+            
             if (p.desglose !== uDes) {
                 html += `<div class="desglose-titulo">📍 ${p.desglose}</div>`;
                 uDes = p.desglose;
@@ -107,26 +144,19 @@
                 <div class="pregunta-card">
                     <p style="margin-top:0;"><strong>${p.pregunta}</strong></p>
                     <div class="opciones">
-                        <div class="radio-btn">
-                            <input type="radio" name="opt-${i}" id="c-${i}" class="check-c">
-                            <label for="c-${i}">CONFORME</label>
-                        </div>
-                        <div class="radio-btn">
-                            <input type="radio" name="opt-${i}" id="nc-${i}" class="check-nc">
-                            <label for="nc-${i}">NO CONFORME</label>
-                        </div>
+                        <div class="radio-btn"><input type="radio" name="opt-${i}" id="c-${i}" class="check-c"><label for="c-${i}">CONFORME</label></div>
+                        <div class="radio-btn"><input type="radio" name="opt-${i}" id="nc-${i}" class="check-nc"><label for="nc-${i}">NO CONFORME</label></div>
                     </div>
                     <div class="evidencia-box">
-                        <input type="text" id="obs-${i}" class="input-obs" placeholder="Agregar nota u observación...">
+                        <input type="text" id="obs-${i}" class="input-obs" placeholder="Nota u observación...">
                         <input type="file" id="file-${i}" accept="image/*" multiple onchange="manejarSeleccion(${i})" style="display:none">
-                        <button class="btn-foto" onclick="document.getElementById('file-${i}').click()">
-                            📷 <span id="txt-foto-${i}">Adjuntar Fotos Evidencia</span>
-                        </button>
+                        <button class="btn-foto" onclick="document.getElementById('file-${i}').click()">📷 <span id="txt-foto-${i}">Adjuntar Fotos</span></button>
                         <div id="preview-${i}" class="preview-fotos"></div>
                     </div>
                 </div>
             `;
         });
+        if (seccionIndex !== -1) html += `</div>`; // Cierra última sección
         area.innerHTML = html;
     }
 
@@ -144,7 +174,7 @@
         const txt = document.getElementById(`txt-foto-${i}`);
         div.innerHTML = "";
         const lista = archivosAcumulados[i] || [];
-        txt.innerText = lista.length > 0 ? `✓ ${lista.length} Fotos preparadas` : "Adjuntar Fotos Evidencia";
+        txt.innerText = lista.length > 0 ? `✓ ${lista.length} Fotos preparadas` : "Adjuntar Fotos";
         lista.forEach((file, index) => {
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -157,9 +187,9 @@
         });
     }
 
-    function borrarFoto(preguntaIdx, fotoIdx) {
-        archivosAcumulados[preguntaIdx].splice(fotoIdx, 1);
-        actualizarVistaPrevia(preguntaIdx);
+    function borrarFoto(preIdx, fotoIdx) {
+        archivosAcumulados[preIdx].splice(fotoIdx, 1);
+        actualizarVistaPrevia(preIdx);
     }
 
     async function enviarEvaluacion() {
@@ -168,7 +198,7 @@
         const btn = document.getElementById('btn-finalizar');
         if (!auditorId || !bodegaId) return alert("⚠️ Selecciona Auditor y Bodega.");
         
-        btn.innerText = "⏳ Subiendo fotos y datos...";
+        btn.innerText = "⏳ Guardando...";
         btn.disabled = true;
         let pObt = 0, pTot = 0, respuestas = [];
 
@@ -211,10 +241,11 @@
         if (!evErr) {
             const finalR = respuestas.map(r => ({ ...r, evaluacion_id: evData[0].id }));
             await _supabase.from('respuestas').insert(finalR);
-            alert(`✅ ÉXITO`);
+            alert(`✅ Auditoría guardada con éxito`);
             location.reload();
         } else {
             btn.disabled = false;
+            alert("Error al guardar la cabecera.");
         }
     }
 
