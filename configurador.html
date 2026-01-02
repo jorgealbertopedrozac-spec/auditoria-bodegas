@@ -174,9 +174,7 @@
         const nom = document.getElementById('a-nom').value;
         const pue = document.getElementById('a-pue').value;
         if(!nom) return alert("El nombre es necesario.");
-
         const payload = { nombre: nom, puesto: pue };
-
         if(editandoAuditorId) {
             await _supabase.from('auditores').update(payload).eq('id', editandoAuditorId);
             editandoAuditorId = null;
@@ -198,7 +196,7 @@
         document.getElementById('btn-save-auditor').className = "btn-action btn-orange";
     }
 
-    // --- BODEGAS Y PREGUNTAS (Tus funciones originales con limpieza) ---
+    // --- GESTIÓN DE BODEGAS ---
     async function cargarBodegas() {
         const { data } = await _supabase.from('bodegas').select('*').order('localizacion');
         document.getElementById('tbody-bodegas').innerHTML = data.map(b => `
@@ -238,9 +236,17 @@
         document.getElementById('btn-save-bodega').className = "btn-action btn-orange";
     }
 
+    // --- GESTIÓN DE PREGUNTAS CON ORDENAMIENTO NATURAL ---
     async function cargarPreguntas() {
-        const { data } = await _supabase.from('configuracion_preguntas').select('*').order('titulo');
-        document.getElementById('tbody-preguntas').innerHTML = data.map(p => `
+        const { data } = await _supabase.from('configuracion_preguntas').select('*');
+        
+        // ORDENAMIENTO NATURAL: 1.1, 1.2 ... 1.10
+        data.sort((a, b) => {
+            return a.desglose.localeCompare(b.desglose, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
+        const tbody = document.getElementById('tbody-preguntas');
+        tbody.innerHTML = data.map(p => `
             <tr>
                 <td><small>${p.titulo}</small><br><strong>${p.desglose}</strong></td>
                 <td>${p.pregunta}</td><td><span class="badge">${p.ponderacion}</span></td>
