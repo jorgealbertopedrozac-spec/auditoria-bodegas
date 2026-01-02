@@ -24,7 +24,6 @@
         .input-obs { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 10px; box-sizing: border-box; }
         .btn-foto { width: 100%; background: #546e7a; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px; }
         
-        /* Estilos para miniaturas con botón eliminar */
         .preview-fotos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         .thumb-container { position: relative; width: 70px; height: 70px; }
         .thumb { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
@@ -68,18 +67,24 @@
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let preguntasGlobal = [];
-    let archivosAcumulados = {}; // Memoria para fotos por pregunta
+    let archivosAcumulados = {};
 
     async function init() {
         const { data: auditores } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
-        const selectA = document.getElementById('selectAuditor');
-        selectA.innerHTML = '<option value="">Selecciona Auditor...</option>' + auditores.map(a => `<option value="${a.id}">${a.nombre}</option>`).join('');
+        document.getElementById('selectAuditor').innerHTML = '<option value="">Selecciona Auditor...</option>' + auditores.map(a => `<option value="${a.id}">${a.nombre}</option>`).join('');
 
         const { data: bodegas } = await _supabase.from('bodegas').select('*').order('localizacion');
-        const selectB = document.getElementById('selectBodega');
-        selectB.innerHTML = '<option value="">Selecciona Bodega...</option>' + bodegas.map(b => `<option value="${b.id}">${b.localizacion} | ${b.departamento} | ${b.nombre}</option>`).join('');
+        document.getElementById('selectBodega').innerHTML = '<option value="">Selecciona Bodega...</option>' + bodegas.map(b => `<option value="${b.id}">${b.localizacion} | ${b.departamento} | ${b.nombre}</option>`).join('');
 
-        const { data: preguntas } = await _supabase.from('configuracion_preguntas').select('*').order('titulo', {ascending: true});
+        // CORRECCIÓN DE ORDENAMIENTO:
+        const { data: preguntas } = await _supabase.from('configuracion_preguntas').select('*');
+        
+        // Ordenamos mediante JavaScript usando "Natural Sort"
+        // Esto hará que 1.1 vaya antes que 1.7 y 1.10 vaya después que 1.9
+        preguntas.sort((a, b) => {
+            return a.desglose.localeCompare(b.desglose, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
         preguntasGlobal = preguntas;
         renderizarAuditoria(preguntas);
     }
@@ -129,11 +134,8 @@
         const input = document.getElementById(`file-${i}`);
         const nuevos = Array.from(input.files);
         if (!archivosAcumulados[i]) archivosAcumulados[i] = [];
-        
-        // Sumar archivos nuevos a la memoria
         archivosAcumulados[i] = [...archivosAcumulados[i], ...nuevos];
-        input.value = ""; // Limpiar input para permitir repetir archivos
-        
+        input.value = ""; 
         actualizarVistaPrevia(i);
     }
 
@@ -141,19 +143,14 @@
         const div = document.getElementById(`preview-${i}`);
         const txt = document.getElementById(`txt-foto-${i}`);
         div.innerHTML = "";
-        
         const lista = archivosAcumulados[i] || [];
         txt.innerText = lista.length > 0 ? `✓ ${lista.length} Fotos preparadas` : "Adjuntar Fotos Evidencia";
-
         lista.forEach((file, index) => {
             const reader = new FileReader();
             reader.onload = (e) => {
                 const container = document.createElement("div");
                 container.className = "thumb-container";
-                container.innerHTML = `
-                    <img src="${e.target.result}" class="thumb">
-                    <button class="btn-del-foto" onclick="borrarFoto(${i}, ${index})">×</button>
-                `;
+                container.innerHTML = `<img src="${e.target.result}" class="thumb"><button class="btn-del-foto" onclick="borrarFoto(${i}, ${index})">×</button>`;
                 div.appendChild(container);
             }
             reader.readAsDataURL(file);
@@ -169,43 +166,33 @@
         const auditorId = document.getElementById('selectAuditor').value;
         const bodegaId = document.getElementById('selectBodega').value;
         const btn = document.getElementById('btn-finalizar');
+        if (!auditorId || !bodegaId) return alert("⚠️ Selecciona Auditor y Bodega.");
         
-        if (!auditorId || !bodegaId) {
-            alert("⚠️ Selecciona Auditor y Bodega.");
-            return;
-        }
-
         btn.innerText = "⏳ Subiendo fotos y datos...";
         btn.disabled = true;
-
         let pObt = 0, pTot = 0, respuestas = [];
 
         for (let i = 0; i < preguntasGlobal.length; i++) {
             const isC = document.getElementById(`c-${i}`).checked;
             const isNC = document.getElementById(`nc-${i}`).checked;
-            const obs = document.getElementById(`obs-${i}`).value;
-            const fotosParaSubir = archivosAcumulados[i] || [];
-
             if (isC || isNC) {
                 const pts = isC ? preguntasGlobal[i].ponderacion : 0;
                 pObt += pts; pTot += preguntasGlobal[i].ponderacion;
-
                 let urlsArray = [];
+                const fotosParaSubir = archivosAcumulados[i] || [];
                 for (let f = 0; f < fotosParaSubir.length; f++) {
-                    const file = fotosParaSubir[f];
                     const path = `ev_${Date.now()}_p${i}_f${f}.jpg`;
-                    const { data: upData } = await _supabase.storage.from('evidencias').upload(path, file);
+                    const { data: upData } = await _supabase.storage.from('evidencias').upload(path, fotosParaSubir[f]);
                     if (upData) {
                         const { data: pub } = _supabase.storage.from('evidencias').getPublicUrl(path);
                         urlsArray.push(pub.publicUrl);
                     }
                 }
-
                 respuestas.push({
                     pregunta_id: preguntasGlobal[i].id,
                     cumple: isC,
                     puntos_obtenidos: pts,
-                    observaciones: obs,
+                    observaciones: document.getElementById(`obs-${i}`).value,
                     foto_url: urlsArray.length > 0 ? urlsArray.join(',') : null 
                 });
             }
@@ -217,23 +204,18 @@
             return;
         }
 
-        const score = (pObt / pTot) * 100;
-
         const { data: evData, error: evErr } = await _supabase.from('evaluaciones').insert([{
-            bodega_id: bodegaId, auditor_id: auditorId, calificacion_final: score.toFixed(2)
+            bodega_id: bodegaId, auditor_id: auditorId, calificacion_final: ((pObt / pTot) * 100).toFixed(2)
         }]).select();
 
-        if (evErr) {
+        if (!evErr) {
+            const finalR = respuestas.map(r => ({ ...r, evaluacion_id: evData[0].id }));
+            await _supabase.from('respuestas').insert(finalR);
+            alert(`✅ ÉXITO`);
+            location.reload();
+        } else {
             btn.disabled = false;
-            btn.innerText = "💾 Guardar Evaluación";
-            return alert("Error al guardar evaluación.");
         }
-
-        const finalR = respuestas.map(r => ({ ...r, evaluacion_id: evData[0].id }));
-        await _supabase.from('respuestas').insert(finalR);
-
-        alert(`✅ ÉXITO: Calificación ${score.toFixed(2)}%`);
-        location.reload();
     }
 
     init();
