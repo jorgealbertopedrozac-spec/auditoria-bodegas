@@ -7,8 +7,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #2c3e50; --secondary: #3498db; --accent: #27ae60; --warning: #f39c12; --danger: #e74c3c; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; padding: 20px; }
-        .container { max-width: 1000px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
         
         h2 { color: var(--primary); text-align: center; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
         
@@ -33,23 +33,32 @@
         .btn-green:hover { background: #219150; }
         .btn-orange { background: var(--warning); }
         
+        /* Resumen de Puntos */
+        .resumen-puntos { background: var(--primary); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .total-badge { font-size: 1.8em; font-weight: bold; padding: 5px 15px; border-radius: 8px; background: rgba(255,255,255,0.1); }
+        .puntos-ok { border: 2px solid var(--accent); color: #2ecc71; }
+        .puntos-error { border: 2px solid var(--danger); color: #ff7675; }
+
+        /* Acordeón de Secciones */
+        .seccion-header { background: #edf2f7; padding: 12px 18px; margin-top: 15px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: var(--primary); transition: 0.2s; border-left: 5px solid var(--secondary); }
+        .seccion-header:hover { background: #e2e8f0; }
+        .seccion-contenido { display: none; margin-bottom: 15px; border: 1px solid #edf2f7; border-top: none; border-radius: 0 0 8px 8px; overflow: hidden; }
+        .seccion-contenido.active { display: block; }
+
         /* Tablas */
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; border-radius: 8px; overflow: hidden; }
-        th, td { text-align: left; padding: 15px; border-bottom: 1px solid #edf2f7; }
-        th { background: #f1f5f9; color: var(--primary); font-size: 0.9em; }
-        .badge { background: #ebf5fb; color: #2980b9; padding: 4px 10px; border-radius: 20px; font-weight: bold; font-size: 0.8em; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { text-align: left; padding: 12px 15px; border-bottom: 1px solid #edf2f7; font-size: 0.9em; }
+        th { background: #f8fafc; color: #64748b; text-transform: uppercase; font-size: 0.75em; }
         
-        .btn-icon { border: none; padding: 8px; border-radius: 6px; cursor: pointer; color: white; margin-right: 5px; }
-        .edit-btn { background: var(--warning); }
+        .btn-icon { border: none; padding: 8px; border-radius: 6px; cursor: pointer; color: white; }
+        .edit-btn { background: var(--warning); margin-right: 5px; }
         .del-btn { background: var(--danger); }
     </style>
 </head>
 <body>
 
-<div style="max-width: 1000px; margin: auto; padding: 10px 0;">
-    <a href="index.html" style="background: #ecf0f1; color: #2c3e50; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.85em; border: 1px solid #ddd;">
-        ⬅ Volver al Inicio
-    </a>
+<div style="max-width: 1100px; margin: auto; padding: 10px 0;">
+    <a href="index.html" style="background: #ecf0f1; color: #2c3e50; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.85em; border: 1px solid #ddd;">⬅ Volver al Inicio</a>
 </div>
     
 <div class="container">
@@ -64,20 +73,11 @@
     <div id="tab-bodegas" class="section active">
         <div class="form-box">
             <div class="grid-3">
-                <div>
-                    <label>📍 Localización (Ciudad)</label>
-                    <input type="text" id="b-loc" placeholder="Ej: Aguascalientes">
-                </div>
-                <div>
-                    <label>🏢 Departamento</label>
-                    <input type="text" id="b-dep" placeholder="Ej: Cerámicos">
-                </div>
-                <div>
-                    <label>📦 Nombre/ID Bodega</label>
-                    <input type="text" id="b-nom" placeholder="Ej: CC">
-                </div>
+                <div><label>📍 Localización</label><input type="text" id="b-loc"></div>
+                <div><label>🏢 Departamento</label><input type="text" id="b-dep"></div>
+                <div><label>📦 Bodega</label><input type="text" id="b-nom"></div>
             </div>
-            <button class="btn-action btn-green" id="btn-save-bodega" onclick="guardarBodega()">Registrar Nueva Bodega</button>
+            <button class="btn-action btn-green" id="btn-save-bodega" onclick="guardarBodega()">Registrar Bodega</button>
         </div>
         <table>
             <thead><tr><th>Localización</th><th>Departamento</th><th>Bodega</th><th>Acciones</th></tr></thead>
@@ -86,44 +86,34 @@
     </div>
 
     <div id="tab-preguntas" class="section">
+        <div class="resumen-puntos">
+            <div>
+                <strong>Resumen de Ponderación:</strong>
+                <div id="desglose-sumas" style="font-size: 0.8em; margin-top: 5px; color: #bdc3c7;">Calculando...</div>
+            </div>
+            <div id="total-puntos" class="total-badge">0 / 100</div>
+        </div>
+
         <div class="form-box">
             <div class="grid-3">
-                <div>
-                    <label>📂 Título (Sección)</label>
-                    <input type="text" id="p-tit" placeholder="Ej: 1. Identificación">
-                </div>
-                <div>
-                    <label>📑 Desglose (Sub-sección)</label>
-                    <input type="text" id="p-des" placeholder="Ej: 1.1 Áreas">
-                </div>
-                <div>
-                    <label>⚖️ Ponderación (Puntos)</label>
-                    <input type="number" id="p-pts" value="10">
-                </div>
+                <div><label>📂 Título (Sección)</label><input type="text" id="p-tit" placeholder="1. Identificación"></div>
+                <div><label>📑 Desglose (Sub-sección)</label><input type="text" id="p-des" placeholder="1.1 Áreas"></div>
+                <div><label>⚖️ Ponderación (Puntos)</label><input type="number" id="p-pts" value="10" step="0.1"></div>
                 <div class="full-width">
                     <label>❓ Pregunta Específica</label>
-                    <textarea id="p-pre" rows="2" placeholder="Escribe la pregunta aquí..."></textarea>
+                    <textarea id="p-pre" rows="2"></textarea>
                 </div>
             </div>
-            <button class="btn-action btn-green" id="btn-save-pregunta" onclick="guardarPregunta()">Añadir al Catálogo</button>
+            <button class="btn-action btn-green" id="btn-save-pregunta" onclick="guardarPregunta()">Guardar Pregunta</button>
         </div>
-        <table>
-            <thead><tr><th>Estructura</th><th>Pregunta</th><th>Peso</th><th>Acciones</th></tr></thead>
-            <tbody id="tbody-preguntas"></tbody>
-        </table>
+        <div id="render-preguntas-acordeon"></div>
     </div>
 
     <div id="tab-auditores" class="section">
         <div class="form-box">
             <div class="grid-3">
-                <div>
-                    <label>👤 Nombre Completo</label>
-                    <input type="text" id="a-nom" placeholder="Ej: Juan Pérez">
-                </div>
-                <div>
-                    <label>💼 Puesto / Cargo</label>
-                    <input type="text" id="a-pue" placeholder="Ej: Supervisor de Almacén">
-                </div>
+                <div><label>👤 Nombre Completo</label><input type="text" id="a-nom"></div>
+                <div><label>💼 Puesto / Cargo</label><input type="text" id="a-pue"></div>
             </div>
             <button class="btn-action btn-green" id="btn-save-auditor" onclick="guardarAuditor()">Registrar Auditor</button>
         </div>
@@ -139,64 +129,107 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqY2t6YmVndHZpYW51cmZ2dWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxOTYzMzUsImV4cCI6MjA4Mjc3MjMzNX0.64zrKi0p1KiDwtBODLRf8O4sRvnn0o9QyoQUYHvVFd0';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    let editandoPreguntaId = null;
-    let editandoBodegaId = null;
-    let editandoAuditorId = null;
+    let editandoId = null;
 
     function switchTab(id) {
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.section, .tab').forEach(el => el.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         event.currentTarget.classList.add('active');
-        
+        editandoId = null; 
         if(id === 'tab-bodegas') cargarBodegas();
         else if(id === 'tab-preguntas') cargarPreguntas();
-        else if(id === 'tab-auditores') cargarAuditores();
+        else cargarAuditores();
     }
 
-    // --- GESTIÓN DE AUDITORES ---
-    async function cargarAuditores() {
-        const { data } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
-        const tbody = document.getElementById('tbody-auditores');
-        tbody.innerHTML = data.map(a => `
-            <tr>
-                <td><strong>${a.nombre}</strong></td>
-                <td>${a.puesto}</td>
-                <td>
-                    <button class="btn-icon edit-btn" onclick='prepararEdicionAuditor(${JSON.stringify(a)})'>✏️</button>
-                    <button class="btn-icon del-btn" onclick="eliminarRegistro('auditores','${a.id}')">🗑️</button>
-                </td>
-            </tr>
-        `).join('');
+    // --- SECCIÓN PREGUNTAS (CON ACORDEÓN Y SUMAS) ---
+    async function cargarPreguntas() {
+        const { data } = await _supabase.from('configuracion_preguntas').select('*');
+        data.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
+
+        const container = document.getElementById('render-preguntas-acordeon');
+        const resumenSuma = document.getElementById('desglose-sumas');
+        const badgeTotal = document.getElementById('total-puntos');
+
+        let sumasPorTitulo = {};
+        let totalGeneral = 0;
+
+        // Calcular sumas
+        data.forEach(p => {
+            let pts = parseFloat(p.ponderacion) || 0;
+            sumasPorTitulo[p.titulo] = (sumasPorTitulo[p.titulo] || 0) + pts;
+            totalGeneral += pts;
+        });
+
+        // Actualizar UI de Ponderación
+        badgeTotal.innerText = `${totalGeneral.toFixed(1)} / 100`;
+        badgeGeneralColor(totalGeneral);
+        resumenSuma.innerText = Object.keys(sumasPorTitulo).map(t => `${t}: ${sumasPorTitulo[t].toFixed(1)}`).join(' | ');
+
+        // Generar HTML agrupado
+        let html = '';
+        let currentTit = '';
+        let idx = 0;
+
+        data.forEach(p => {
+            if (p.titulo !== currentTit) {
+                if (currentTit !== '') html += `</tbody></table></div>`; // Cerrar sección previa
+                idx++;
+                html += `
+                    <div class="seccion-header" onclick="document.getElementById('sec-${idx}').classList.toggle('active')">
+                        <span>${p.titulo} <small style="margin-left:15px; color:#718096">(${sumasPorTitulo[p.titulo].toFixed(1)} pts)</small></span>
+                        <span>🔽</span>
+                    </div>
+                    <div id="sec-${idx}" class="seccion-contenido">
+                        <table>
+                            <thead><tr><th width="15%">Cód</th><th>Pregunta</th><th width="10%">Pts</th><th width="15%">Acciones</th></tr></thead>
+                            <tbody>`;
+                currentTit = p.titulo;
+            }
+            html += `
+                <tr>
+                    <td><strong>${p.desglose}</strong></td>
+                    <td>${p.pregunta}</td>
+                    <td>${p.ponderacion}</td>
+                    <td>
+                        <button class="btn-icon edit-btn" onclick='prepararEdicionPregunta(${JSON.stringify(p)})'>✏️</button>
+                        <button class="btn-icon del-btn" onclick="eliminarRegistro('configuracion_preguntas','${p.id}')">🗑️</button>
+                    </td>
+                </tr>`;
+        });
+        container.innerHTML = html + `</tbody></table></div>`;
     }
 
-    async function guardarAuditor() {
-        const nom = document.getElementById('a-nom').value;
-        const pue = document.getElementById('a-pue').value;
-        if(!nom) return alert("El nombre es necesario.");
-        const payload = { nombre: nom, puesto: pue };
-        if(editandoAuditorId) {
-            await _supabase.from('auditores').update(payload).eq('id', editandoAuditorId);
-            editandoAuditorId = null;
-            document.getElementById('btn-save-auditor').innerText = "Registrar Auditor";
-            document.getElementById('btn-save-auditor').className = "btn-action btn-green";
-        } else {
-            await _supabase.from('auditores').insert([payload]);
-        }
-        document.getElementById('a-nom').value = '';
-        document.getElementById('a-pue').value = '';
-        cargarAuditores();
+    function badgeGeneralColor(total) {
+        const el = document.getElementById('total-puntos');
+        if (total.toFixed(1) == 100.0) el.className = "total-badge puntos-ok";
+        else el.className = "total-badge puntos-error";
     }
 
-    function prepararEdicionAuditor(a) {
-        document.getElementById('a-nom').value = a.nombre;
-        document.getElementById('a-pue').value = a.puesto;
-        editandoAuditorId = a.id;
-        document.getElementById('btn-save-auditor').innerText = "💾 Guardar Cambios";
-        document.getElementById('btn-save-auditor').className = "btn-action btn-orange";
+    async function guardarPregunta() {
+        const payload = { 
+            titulo: document.getElementById('p-tit').value, 
+            desglose: document.getElementById('p-des').value, 
+            pregunta: document.getElementById('p-pre').value, 
+            ponderacion: parseFloat(document.getElementById('p-pts').value) 
+        };
+        if(editandoId) await _supabase.from('configuracion_preguntas').update(payload).eq('id', editandoId);
+        else await _supabase.from('configuracion_preguntas').insert([payload]);
+        resetForm('p');
+        cargarPreguntas();
     }
 
-    // --- GESTIÓN DE BODEGAS ---
+    function prepararEdicionPregunta(p) {
+        document.getElementById('p-tit').value = p.titulo;
+        document.getElementById('p-des').value = p.desglose;
+        document.getElementById('p-pre').value = p.pregunta;
+        document.getElementById('p-pts').value = p.ponderacion;
+        editandoId = p.id;
+        document.getElementById('btn-save-pregunta').innerText = "💾 Guardar Cambios";
+        document.getElementById('btn-save-pregunta').className = "btn-action btn-orange";
+        window.scrollTo(0,0);
+    }
+
+    // --- SECCIÓN BODEGAS ---
     async function cargarBodegas() {
         const { data } = await _supabase.from('bodegas').select('*').order('localizacion');
         document.getElementById('tbody-bodegas').innerHTML = data.map(b => `
@@ -206,24 +239,14 @@
                     <button class="btn-icon edit-btn" onclick='prepararEdicionBodega(${JSON.stringify(b)})'>✏️</button>
                     <button class="btn-icon del-btn" onclick="eliminarRegistro('bodegas','${b.id}')">🗑️</button>
                 </td>
-            </tr>
-        `).join('');
+            </tr>`).join('');
     }
 
     async function guardarBodega() {
-        const payload = { 
-            localizacion: document.getElementById('b-loc').value, 
-            departamento: document.getElementById('b-dep').value, 
-            nombre: document.getElementById('b-nom').value 
-        };
-        if(editandoBodegaId) {
-            await _supabase.from('bodegas').update(payload).eq('id', editandoBodegaId);
-            editandoBodegaId = null;
-            document.getElementById('btn-save-bodega').innerText = "Registrar Nueva Bodega";
-            document.getElementById('btn-save-bodega').className = "btn-action btn-green";
-        } else {
-            await _supabase.from('bodegas').insert([payload]);
-        }
+        const payload = { localizacion: document.getElementById('b-loc').value, departamento: document.getElementById('b-dep').value, nombre: document.getElementById('b-nom').value };
+        if(editandoId) await _supabase.from('bodegas').update(payload).eq('id', editandoId);
+        else await _supabase.from('bodegas').insert([payload]);
+        resetForm('b');
         cargarBodegas();
     }
 
@@ -231,71 +254,62 @@
         document.getElementById('b-loc').value = b.localizacion;
         document.getElementById('b-dep').value = b.departamento;
         document.getElementById('b-nom').value = b.nombre;
-        editandoBodegaId = b.id;
+        editandoId = b.id;
         document.getElementById('btn-save-bodega').innerText = "💾 Guardar Cambios";
-        document.getElementById('btn-save-bodega').className = "btn-action btn-orange";
     }
 
-    // --- GESTIÓN DE PREGUNTAS CON ORDENAMIENTO NATURAL ---
-    async function cargarPreguntas() {
-        const { data } = await _supabase.from('configuracion_preguntas').select('*');
-        
-        // ORDENAMIENTO NATURAL: 1.1, 1.2 ... 1.10
-        data.sort((a, b) => {
-            return a.desglose.localeCompare(b.desglose, undefined, { numeric: true, sensitivity: 'base' });
-        });
-
-        const tbody = document.getElementById('tbody-preguntas');
-        tbody.innerHTML = data.map(p => `
+    // --- SECCIÓN AUDITORES ---
+    async function cargarAuditores() {
+        const { data } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
+        document.getElementById('tbody-auditores').innerHTML = data.map(a => `
             <tr>
-                <td><small>${p.titulo}</small><br><strong>${p.desglose}</strong></td>
-                <td>${p.pregunta}</td><td><span class="badge">${p.ponderacion}</span></td>
+                <td><strong>${a.nombre}</strong></td><td>${a.puesto}</td>
                 <td>
-                    <button class="btn-icon edit-btn" onclick='prepararEdicionPregunta(${JSON.stringify(p)})'>✏️</button>
-                    <button class="btn-icon del-btn" onclick="eliminarRegistro('configuracion_preguntas','${p.id}')">🗑️</button>
+                    <button class="btn-icon edit-btn" onclick='prepararEdicionAuditor(${JSON.stringify(a)})'>✏️</button>
+                    <button class="btn-icon del-btn" onclick="eliminarRegistro('auditores','${a.id}')">🗑️</button>
                 </td>
-            </tr>
-        `).join('');
+            </tr>`).join('');
     }
 
-    async function guardarPregunta() {
-        const payload = { 
-            titulo: document.getElementById('p-tit').value, 
-            desglose: document.getElementById('p-des').value, 
-            pregunta: document.getElementById('p-pre').value, 
-            ponderacion: document.getElementById('p-pts').value 
-        };
-        if(editandoPreguntaId) {
-            await _supabase.from('configuracion_preguntas').update(payload).eq('id', editandoPreguntaId);
-            editandoPreguntaId = null;
+    async function guardarAuditor() {
+        const payload = { nombre: document.getElementById('a-nom').value, puesto: document.getElementById('a-pue').value };
+        if(editandoId) await _supabase.from('auditores').update(payload).eq('id', editandoId);
+        else await _supabase.from('auditores').insert([payload]);
+        resetForm('a');
+        cargarAuditores();
+    }
+
+    function prepararEdicionAuditor(a) {
+        document.getElementById('a-nom').value = a.nombre;
+        document.getElementById('a-pue').value = a.puesto;
+        editandoId = a.id;
+        document.getElementById('btn-save-auditor').innerText = "💾 Guardar Cambios";
+    }
+
+    // --- UTILIDADES ---
+    function resetForm(prefix) {
+        editandoId = null;
+        if(prefix === 'p') {
+            document.getElementById('p-pre').value = '';
             document.getElementById('btn-save-pregunta').innerText = "Añadir al Catálogo";
             document.getElementById('btn-save-pregunta').className = "btn-action btn-green";
+        } else if (prefix === 'b') {
+            document.getElementById('b-loc').value = ''; document.getElementById('b-dep').value = ''; document.getElementById('b-nom').value = '';
+            document.getElementById('btn-save-bodega').innerText = "Registrar Nueva Bodega";
         } else {
-            await _supabase.from('configuracion_preguntas').insert([payload]);
+            document.getElementById('a-nom').value = ''; document.getElementById('a-pue').value = '';
+            document.getElementById('btn-save-auditor').innerText = "Registrar Auditor";
         }
-        cargarPreguntas();
-    }
-
-    function prepararEdicionPregunta(p) {
-        document.getElementById('p-tit').value = p.titulo;
-        document.getElementById('p-des').value = p.desglose;
-        document.getElementById('p-pre').value = p.pregunta;
-        document.getElementById('p-pts').value = p.ponderacion;
-        editandoPreguntaId = p.id;
-        document.getElementById('btn-save-pregunta').innerText = "💾 Guardar Cambios";
-        document.getElementById('btn-save-pregunta').className = "btn-action btn-orange";
     }
 
     async function eliminarRegistro(tabla, id) {
-        if(confirm("¿Eliminar registro?")) {
+        if(confirm("¿Estás seguro de eliminar este registro?")) {
             await _supabase.from(tabla).delete().eq('id', id);
-            if(tabla==='bodegas') cargarBodegas();
-            else if(tabla==='auditores') cargarAuditores();
-            else cargarPreguntas();
+            if(tabla==='bodegas') cargarBodegas(); else if(tabla==='auditores') cargarAuditores(); else cargarPreguntas();
         }
     }
 
-    cargarBodegas(); // Carga inicial
+    cargarBodegas(); // Inicial
 </script>
 </body>
 </html>
