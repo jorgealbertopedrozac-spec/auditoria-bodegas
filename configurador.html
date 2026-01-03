@@ -84,7 +84,7 @@
                 <div><label>🏢 Departamento</label><input type="text" id="b-dep"></div>
                 <div><label>📦 Nombre</label><input type="text" id="b-nom"></div>
             </div>
-            <button class="btn-action btn-green" id="btn-save-bodega" onclick="guardarBodega()">Registrar Unidad</button>
+            <button class="btn-action btn-green" onclick="guardarBodega()">Registrar Unidad</button>
         </div>
         <table><thead><tr><th>Localización</th><th>Departamento</th><th>Nombre</th><th>Acciones</th></tr></thead><tbody id="tbody-bodegas"></tbody></table>
     </div>
@@ -102,9 +102,9 @@
 
     <div id="tab-backup" class="section">
         <div class="form-box">
-            <h3>Excel / CSV (Solo Preguntas)</h3>
-            <p>Descarga la plantilla específica para: <strong id="area-text-csv" style="color:var(--secondary)"></strong></p>
-            <button class="btn-action btn-outline" onclick="descargarPlantillaCSV()">📄 Descargar Plantilla CSV</button>
+            <h3>Excel / CSV (Edición Masiva)</h3>
+            <p>Descarga la información registrada en <strong><span id="area-text-csv"></span></strong> para editarla en Excel y volverla a subir.</p>
+            <button class="btn-action btn-outline" onclick="descargarDatosCSV()">📊 Descargar Datos Actuales (CSV)</button>
             <hr>
             <input type="file" id="csvFile" accept=".csv" style="margin-bottom:10px;">
             <button class="btn-action btn-orange" onclick="importarCSV()">📤 Importar Catálogo CSV</button>
@@ -112,10 +112,9 @@
         
         <div class="form-box">
             <h3>Respaldo Total JSON (Preguntas + Ubicaciones)</h3>
-            <p>Guarda o restaura la configuración completa de esta área.</p>
+            <p>Guarda o restaura la configuración completa del área actual.</p>
             <button class="btn-action btn-blue" onclick="exportarDatos()">📥 Exportar Respaldo JSON</button>
             <hr>
-            <label style="font-size: 0.8em; color: gray;">Seleccionar archivo para restaurar:</label>
             <input type="file" id="jsonFile" accept=".json" style="margin-bottom:10px;">
             <button class="btn-action btn-green" onclick="importarJSON()">📥 Restaurar Respaldo JSON</button>
         </div>
@@ -148,38 +147,48 @@
         if(id === 'tab-backup') document.getElementById('area-text-csv').innerText = tipoArea.toUpperCase();
     }
 
-    // --- MEJORA: DESCARGA DE PLANTILLA CSV ---
-    function descargarPlantillaCSV() {
+    // --- MEJORA: DESCARGA DE DATOS REALES EN CSV ---
+    async function descargarDatosCSV() {
         const areaActual = getAreaURL();
-        const headers = "titulo,desglose,pregunta,ponderacion,aplica_a_departamento";
-        const ejemplo = areaActual === 'almacen' 
-            ? "\n1. ALMACEN EJEMPLO,1.1,¿Los pasillos están libres?,10,TODOS"
-            : "\n1. REPARTO EJEMPLO,1.1,¿La unidad tiene combustible?,10,TODOS";
+        const { data: preguntas, error } = await _supabase
+            .from('configuracion_preguntas')
+            .select('titulo, desglose, pregunta, ponderacion, aplica_a_departamento')
+            .eq('tipo', areaActual);
+
+        if (error) return alert("Error al obtener datos: " + error.message);
+
+        const headers = "titulo,desglose,pregunta,ponderacion,aplica_a_departamento\n";
         
-        const blob = new Blob([headers + ejemplo], { type: 'text/csv;charset=utf-8;' });
+        const filasCsv = preguntas.map(p => {
+            return [
+                `"${p.titulo.replace(/"/g, '""')}"`,
+                `"${p.desglose.replace(/"/g, '""')}"`,
+                `"${p.pregunta.replace(/"/g, '""')}"`,
+                p.ponderacion,
+                `"${p.aplica_a_departamento.replace(/"/g, '""')}"`
+            ].join(",");
+        }).join("\n");
+
+        const blob = new Blob([headers + filasCsv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = `plantilla_${areaActual}.csv`;
+        link.download = `catalogo_${areaActual}_${new Date().toISOString().slice(0,10)}.csv`;
         link.click();
         URL.revokeObjectURL(link.href);
     }
 
-    // --- MEJORA: EXPORTACIÓN JSON FILTRADA ---
     async function exportarDatos() {
         const areaActual = getAreaURL();
         const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', areaActual);
         const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', areaActual);
-        
         const dataExport = { area: areaActual, preguntas: p, bodegas: b };
         const blob = new Blob([JSON.stringify(dataExport, null, 2)], {type:'application/json'});
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = `respaldo_${areaActual}.json`;
         a.click();
-        URL.revokeObjectURL(a.href);
     }
 
-    // --- MEJORA: IMPORTACIÓN JSON ---
     async function importarJSON() {
         const areaActual = getAreaURL();
         const file = document.getElementById('jsonFile').files[0];
@@ -200,7 +209,6 @@
         reader.readAsText(file);
     }
 
-    // --- IMPORTACIÓN CSV ---
     async function importarCSV() {
         const areaActual = getAreaURL();
         const fileInput = document.getElementById('csvFile');
@@ -211,10 +219,16 @@
             const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
             const preguntas = [];
             for(let i=1; i<rows.length; i++) {
-                const cols = rows[i].split(',');
-                if(cols.length < 4) continue;
+                // Regex para manejar celdas con comas dentro de comillas
+                const cols = rows[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+                if(!cols || cols.length < 4) continue;
+                
                 let rowData = {};
-                headers.forEach((h, idx) => rowData[h] = cols[idx]?.trim());
+                headers.forEach((h, idx) => {
+                    let val = cols[idx] ? cols[idx].trim() : "";
+                    rowData[h] = val.replace(/^"|"$/g, '').replace(/""/g, '"');
+                });
+                
                 preguntas.push({
                     titulo: rowData.titulo, desglose: rowData.desglose, pregunta: rowData.pregunta,
                     ponderacion: parseFloat(rowData.ponderacion), aplica_a_departamento: rowData.aplica_a_departamento || "TODOS",
@@ -228,7 +242,6 @@
         reader.readAsText(fileInput.files[0]);
     }
 
-    // --- CARGAS Y GUARDADOS ---
     function actualizarMenuDepartamentos() {
         const select = document.getElementById('p-depto-filtro');
         const val = select.value;
@@ -307,8 +320,18 @@
 
     function resetForm(prefix) {
         editandoId = null;
-        if(prefix==='p') { document.getElementById('p-pre').value=''; document.getElementById('p-tit').value=''; document.getElementById('p-des').value=''; document.getElementById('btn-save-pregunta').innerText="Guardar Pregunta"; document.getElementById('btn-save-pregunta').className="btn-action btn-green"; }
-        else if(prefix==='b') { document.getElementById('b-loc').value=''; document.getElementById('b-dep').value=''; document.getElementById('b-nom').value=''; }
+        if(prefix==='p') { 
+            document.getElementById('p-pre').value=''; 
+            document.getElementById('p-tit').value=''; 
+            document.getElementById('p-des').value=''; 
+            document.getElementById('btn-save-pregunta').innerText="Guardar Pregunta"; 
+            document.getElementById('btn-save-pregunta').className="btn-action btn-green"; 
+        }
+        else if(prefix==='b') { 
+            document.getElementById('b-loc').value=''; 
+            document.getElementById('b-dep').value=''; 
+            document.getElementById('b-nom').value=''; 
+        }
     }
 
     async function eliminarRegistro(tabla, id) {
