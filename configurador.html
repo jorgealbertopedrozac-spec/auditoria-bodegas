@@ -3,278 +3,331 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Multi-Área - Auditoría</title>
+    <title>Realizar Auditoría Pro - Dinámica</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --secondary: #3498db; --accent: #27ae60; --warning: #f39c12; --danger: #e74c3c; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
-        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        :root { --primary: #2c3e50; --success: #27ae60; --danger: #e74c3c; --bg: #f0f2f5; --accent: #3498db; }
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: var(--bg); 
+            margin: 0; 
+            padding: 10px; 
+            padding-top: 75px; 
+            padding-bottom: 120px; 
+        }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         
-        h2 { color: var(--primary); text-align: center; margin-bottom: 10px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        .area-indicator { text-align: center; font-weight: bold; color: var(--secondary); text-transform: uppercase; margin-bottom: 20px; font-size: 0.9em; letter-spacing: 1px; }
+        .score-bar {
+            position: fixed; top: 0; left: 0; width: 100%; background: var(--primary);
+            color: white; padding: 10px 15px; z-index: 2000; display: flex;
+            justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            font-weight: bold; border-bottom: 3px solid var(--accent);
+            box-sizing: border-box;
+        }
 
-        .tabs { display: flex; gap: 10px; margin-bottom: 25px; border-bottom: 2px solid #eee; overflow-x: auto; }
-        .tab { padding: 12px 25px; cursor: pointer; border: none; background: none; font-weight: bold; color: #95a5a6; transition: 0.3s; white-space: nowrap; }
-        .tab.active { color: var(--secondary); border-bottom: 3px solid var(--secondary); }
-        
-        .section { display: none; }
-        .section.active { display: block; }
+        .btn-inicio-flotante {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8em;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
 
-        .form-box { background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 30px; border: 1px solid #e9ecef; }
-        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
-        .full-width { grid-column: 1 / -1; }
+        h2 { text-align: center; color: var(--primary); margin-top: 10px; }
+        .area-tag { text-align: center; font-weight: bold; color: var(--accent); text-transform: uppercase; margin-bottom: 10px; font-size: 0.9em; }
         
-        label { display: block; font-size: 0.85em; font-weight: bold; margin-bottom: 6px; color: #34495e; }
-        input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        .header-info { background: #fff; padding: 15px; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 20px; }
         
-        .btn-action { width: 100%; padding: 12px; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-        .btn-green { background: var(--accent); }
-        .btn-orange { background: var(--warning); }
+        .seccion-titulo { 
+            background: var(--primary); color: white; padding: 12px; border-radius: 8px; 
+            margin-top: 20px; font-weight: bold; text-transform: uppercase; font-size: 0.85em; 
+            cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
         
-        /* Resumen de Puntos */
-        .resumen-puntos { background: var(--primary); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-        .total-badge { font-size: 1.8em; font-weight: bold; padding: 5px 15px; border-radius: 8px; background: rgba(255,255,255,0.1); border: 2px solid transparent; }
-        .puntos-ok { border-color: var(--accent); color: #2ecc71; }
-        .puntos-error { border-color: var(--danger); color: #ff7675; }
+        .seccion-contenido { display: block; padding-top: 10px; }
+        .seccion-contenido.hidden { display: none; }
 
-        /* Acordeón */
-        .seccion-header { background: #edf2f7; padding: 12px 18px; margin-top: 15px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: var(--primary); border-left: 5px solid var(--secondary); }
-        .seccion-contenido { display: none; margin-bottom: 15px; border: 1px solid #edf2f7; border-top: none; border-radius: 0 0 8px 8px; overflow: hidden; }
-        .seccion-contenido.active { display: block; }
-
-        table { width: 100%; border-collapse: collapse; background: white; }
-        th, td { text-align: left; padding: 12px 15px; border-bottom: 1px solid #edf2f7; font-size: 0.9em; }
-        th { background: #f8fafc; color: #64748b; text-transform: uppercase; font-size: 0.75em; }
+        .desglose-titulo { font-weight: bold; color: #555; margin: 20px 0 10px 10px; border-left: 4px solid var(--success); padding-left: 10px; font-size: 1.1em; }
+        .pregunta-card { background: #fff; padding: 18px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #eee; transition: 0.3s; }
         
-        .btn-icon { border: none; padding: 8px; border-radius: 6px; cursor: pointer; color: white; }
-        .edit-btn { background: var(--warning); margin-right: 5px; }
-        .del-btn { background: var(--danger); }
+        .radio-btn label { display: block; text-align: center; padding: 12px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .check-c:checked + label { background: var(--success); color: white; border-color: var(--success); }
+        .check-nc:checked + label { background: var(--danger); color: white; border-color: var(--danger); }
+
+        .evidencia-box { background: #f8f9fa; padding: 12px; border-radius: 8px; border: 1px dashed #ccc; }
+        .input-obs { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 10px; box-sizing: border-box; }
+        .btn-foto { width: 100%; background: #546e7a; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        
+        .preview-fotos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .thumb-container { position: relative; width: 70px; height: 70px; }
+        .thumb { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
+        .btn-del-foto { position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+
+        #btn-finalizar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; background: var(--primary); color: white; border: none; padding: 18px; border-radius: 50px; font-size: 1.2em; font-weight: bold; cursor: pointer; box-shadow: 0 5px 20px rgba(0,0,0,0.3); z-index: 1000; }
+        #btn-finalizar:disabled { background: #95a5a6; }
+        select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 1em; background: #fff; margin-top: 5px; }
     </style>
 </head>
 <body>
 
-<div style="max-width: 1100px; margin: auto; padding: 10px 0;">
-    <a href="index.html" style="background: #ecf0f1; color: #2c3e50; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.85em; border: 1px solid #ddd;">⬅ Volver al Inicio</a>
+<div class="score-bar">
+    <a id="btn-regresar" href="index.html" class="btn-inicio-flotante">⬅ Inicio</a>
+    <div style="font-size: 0.85em;">Progreso: <span id="realtime-progress">0</span>/<span id="realtime-total-q">0</span></div>
+    <div style="font-size: 1.2em;"><span id="realtime-score">0.0</span>%</div>
 </div>
-    
+
 <div class="container">
-    <div id="area-label" class="area-indicator">Cargando área...</div>
-    <h2>⚙️ Panel Administrativo</h2>
+    <div id="tipo-area-display" class="area-tag">Cargando área...</div>
+    <h2>📋 Formulario de Auditoría</h2>
     
-    <div class="tabs">
-        <button class="tab active" onclick="switchTab('tab-preguntas')">📋 Catálogo de Preguntas</button>
-        <button class="tab" onclick="switchTab('tab-bodegas')">📍 Ubicaciones/Rutas</button>
-        <button class="tab" onclick="switchTab('tab-auditores')">👥 Auditores</button>
+    <div class="header-info">
+        <div><label><strong>👤 Auditor</strong></label><select id="selectAuditor"></select></div>
+        <div style="margin-top:10px;">
+            <label><strong>📦 Ubicación / Unidad</strong></label>
+            <select id="selectBodega" onchange="filtrarYRenderizar()"></select>
+        </div>
     </div>
 
-    <div id="tab-preguntas" class="section active">
-        <div class="resumen-puntos">
-            <div>
-                <strong>Resumen de Ponderación:</strong>
-                <div id="desglose-sumas" style="font-size: 0.8em; margin-top: 5px; color: #bdc3c7;">Calculando...</div>
-            </div>
-            <div id="total-puntos" class="total-badge">0 / 100</div>
-        </div>
-
-        <div class="form-box">
-            <div class="grid-3">
-                <div><label>📂 Título (Sección)</label><input type="text" id="p-tit" placeholder="1. Identificación"></div>
-                <div><label>📑 Desglose (Sub-sección)</label><input type="text" id="p-des" placeholder="1.1 Áreas"></div>
-                <div><label>⚖️ Ponderación (Puntos)</label><input type="number" id="p-pts" value="10" step="0.1"></div>
-                <div class="full-width">
-                    <label>❓ Pregunta Específica</label>
-                    <textarea id="p-pre" rows="2"></textarea>
-                </div>
-            </div>
-            <button class="btn-action btn-green" id="btn-save-pregunta" onclick="guardarPregunta()">Guardar Pregunta</button>
-        </div>
-        <div id="render-preguntas-acordeon"></div>
-    </div>
-
-    <div id="tab-bodegas" class="section">
-        <div class="form-box">
-            <div class="grid-3">
-                <div><label>📍 Localización</label><input type="text" id="b-loc"></div>
-                <div><label>🏢 Departamento/Zona</label><input type="text" id="b-dep"></div>
-                <div><label>📦 Nombre Unidad</label><input type="text" id="b-nom"></div>
-            </div>
-            <button class="btn-action btn-green" id="btn-save-bodega" onclick="guardarBodega()">Registrar Unidad</button>
-        </div>
-        <table>
-            <thead><tr><th>Localización</th><th>Zona</th><th>Nombre</th><th>Acciones</th></tr></thead>
-            <tbody id="tbody-bodegas"></tbody>
-        </table>
-    </div>
-
-    <div id="tab-auditores" class="section">
-        <div class="form-box">
-            <div class="grid-3">
-                <div><label>👤 Nombre Completo</label><input type="text" id="a-nom"></div>
-                <div><label>💼 Puesto</label><input type="text" id="a-pue"></div>
-            </div>
-            <button class="btn-action btn-green" id="btn-save-auditor" onclick="guardarAuditor()">Registrar Auditor</button>
-        </div>
-        <table>
-            <thead><tr><th>Nombre</th><th>Puesto</th><th>Acciones</th></tr></thead>
-            <tbody id="tbody-auditores"></tbody>
-        </table>
+    <div id="renderArea">
+        <p style="text-align: center; color: #7f8c8d; padding: 20px;">Por favor, seleccione una ubicación para cargar las preguntas.</p>
     </div>
 </div>
+
+<button id="btn-finalizar" onclick="enviarEvaluacion()">💾 Guardar Evaluación</button>
 
 <script>
     const SUPABASE_URL = 'https://xjckzbegtvianurfvubp.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqY2t6YmVndHZpYW51cmZ2dWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxOTYzMzUsImV4cCI6MjA4Mjc3MjMzNX0.64zrKi0p1KiDwtBODLRf8O4sRvnn0o9QyoQUYHvVFd0';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // DETECTAR ÁREA DESDE URL
     const urlParams = new URLSearchParams(window.location.search);
-    const tipoArea = urlParams.get('tipo') || 'almacen';
-    let editandoId = null;
+    const tipoAuditoria = urlParams.get('tipo') || 'almacen';
 
-    function init() {
-        document.getElementById('area-label').innerText = `Configurando Área: ${tipoArea}`;
-        cargarPreguntas();
+    let preguntasMaestras = []; // Todas las del área (almacen o reparto)
+    let preguntasFiltradas = []; // Solo las que aplican al depto/zona actual
+    let bodegasData = [];
+    let archivosAcumulados = {};
+
+    async function init() {
+        document.getElementById('tipo-area-display').innerText = `Área: ${tipoAuditoria}`;
+        document.getElementById('btn-regresar').href = `menu_area.html?tipo=${tipoAuditoria}`;
+        
+        // Cargar Auditores
+        const { data: a } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
+        document.getElementById('selectAuditor').innerHTML = '<option value="">Selecciona Auditor...</option>' + a.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
+
+        // Cargar Bodegas del área
+        const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoAuditoria).order('localizacion');
+        bodegasData = b;
+        document.getElementById('selectBodega').innerHTML = '<option value="">Selecciona Ubicación...</option>' + b.map(x => `<option value="${x.id}">${x.localizacion} | ${x.departamento} | ${x.nombre}</option>`).join('');
+
+        // Cargar TODAS las preguntas del área
+        const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoAuditoria);
+        preguntasMaestras = p.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
     }
 
-    function switchTab(id) {
-        document.querySelectorAll('.section, .tab').forEach(el => el.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
-        event.currentTarget.classList.add('active');
-        editandoId = null; 
-        if(id === 'tab-bodegas') cargarBodegas();
-        else if(id === 'tab-preguntas') cargarPreguntas();
-        else cargarAuditores();
+    function filtrarYRenderizar() {
+        const bodegaId = document.getElementById('selectBodega').value;
+        if (!bodegaId) {
+            document.getElementById('renderArea').innerHTML = '<p style="text-align: center; color: #7f8c8d; padding: 20px;">Seleccione una ubicación.</p>';
+            return;
+        }
+
+        const bodegaSel = bodegasData.find(x => x.id == bodegaId);
+        const deptoBodega = bodegaSel.departamento;
+
+        // FILTRO: Solo preguntas para "TODOS" o que coincidan con el Depto/Zona de la bodega
+        preguntasFiltradas = preguntasMaestras.filter(p => 
+            p.aplica_a_departamento === 'TODOS' || p.aplica_a_departamento === deptoBodega
+        );
+
+        document.getElementById('realtime-total-q').innerText = preguntasFiltradas.length;
+        renderizarAuditoria(preguntasFiltradas);
+        actualizarPuntajeRealTime();
     }
 
-    // --- PREGUNTAS (FILTRADAS POR TIPO) ---
-    async function cargarPreguntas() {
-        const { data } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoArea);
-        data.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
+    function toggleSeccion(index) {
+        const content = document.getElementById(`seccion-content-${index}`);
+        const icon = document.getElementById(`icon-${index}`);
+        content.classList.toggle('hidden');
+        icon.innerText = content.classList.contains('hidden') ? "🔽" : "🔼";
+    }
 
-        const container = document.getElementById('render-preguntas-acordeon');
-        const resumenSuma = document.getElementById('desglose-sumas');
-        const badgeTotal = document.getElementById('total-puntos');
+    function renderizarAuditoria(preguntas) {
+        const area = document.getElementById('renderArea');
+        let html = '', uTit = '', uDes = '', seccionIndex = -1;
 
-        let sumasPorTitulo = {};
-        let totalGeneral = 0;
+        if (preguntas.length === 0) {
+            area.innerHTML = '<p style="text-align:center; color:var(--danger); padding:20px;">No hay preguntas configuradas para este departamento específico.</p>';
+            return;
+        }
 
-        data.forEach(p => {
-            let pts = parseFloat(p.ponderacion) || 0;
-            sumasPorTitulo[p.titulo] = (sumasPorTitulo[p.titulo] || 0) + pts;
-            totalGeneral += pts;
-        });
-
-        badgeTotal.innerText = `${totalGeneral.toFixed(1)} / 100`;
-        badgeTotal.className = `total-badge ${totalGeneral.toFixed(1) == 100.0 ? 'puntos-ok' : 'puntos-error'}`;
-        resumenSuma.innerText = Object.keys(sumasPorTitulo).map(t => `${t}: ${sumasPorTitulo[t].toFixed(1)}`).join(' | ');
-
-        let html = '', currentTit = '', idx = 0;
-        data.forEach(p => {
-            if (p.titulo !== currentTit) {
-                if (currentTit !== '') html += `</tbody></table></div>`;
-                idx++;
+        preguntas.forEach((p, i) => {
+            if (p.titulo !== uTit) {
+                if (seccionIndex !== -1) html += `</div>`;
+                seccionIndex++;
                 html += `
-                    <div class="seccion-header" onclick="document.getElementById('sec-${idx}').classList.toggle('active')">
-                        <span>${p.titulo} <small style="margin-left:15px; color:#718096">(${sumasPorTitulo[p.titulo].toFixed(1)} pts)</small></span>
-                        <span>🔽</span>
+                    <div class="seccion-titulo" onclick="toggleSeccion(${seccionIndex})">
+                        <span>${p.titulo} <small id="score-sec-${seccionIndex}" style="margin-left:10px; color:#bdc3c7;">(0%)</small></span>
+                        <span id="icon-${seccionIndex}">🔽</span>
                     </div>
-                    <div id="sec-${idx}" class="seccion-contenido">
-                        <table><thead><tr><th width="15%">Cód</th><th>Pregunta</th><th width="10%">Pts</th><th width="15%">Acciones</th></tr></thead><tbody>`;
-                currentTit = p.titulo;
+                    <div id="seccion-content-${seccionIndex}" class="seccion-contenido hidden">`;
+                uTit = p.titulo;
+                uDes = ''; 
             }
-            html += `<tr><td><strong>${p.desglose}</strong></td><td>${p.pregunta}</td><td>${p.ponderacion}</td><td>
-                <button class="btn-icon edit-btn" onclick='prepararEdicionPregunta(${JSON.stringify(p)})'>✏️</button>
-                <button class="btn-icon del-btn" onclick="eliminarRegistro('configuracion_preguntas','${p.id}')">🗑️</button>
-            </td></tr>`;
+            
+            if (p.desglose !== uDes) {
+                html += `<div class="desglose-titulo">📍 ${p.desglose}</div>`;
+                uDes = p.desglose;
+            }
+
+            html += `
+                <div class="pregunta-card" data-idx="${i}" data-secidx="${seccionIndex}">
+                    <p style="margin-top:0;"><strong>${p.pregunta}</strong></p>
+                    <div class="opciones">
+                        <div class="radio-btn">
+                            <input type="radio" name="opt-${i}" id="c-${i}" class="check-c" onchange="actualizarPuntajeRealTime()">
+                            <label for="c-${i}">CONFORME</label>
+                        </div>
+                        <div class="radio-btn">
+                            <input type="radio" name="opt-${i}" id="nc-${i}" class="check-nc" onchange="actualizarPuntajeRealTime()">
+                            <label for="nc-${i}">NO CONFORME</label>
+                        </div>
+                    </div>
+                    <div class="evidencia-box">
+                        <input type="text" id="obs-${i}" class="input-obs" placeholder="Observaciones...">
+                        <input type="file" id="file-${i}" accept="image/*" multiple onchange="manejarSeleccion(${i})" style="display:none">
+                        <button class="btn-foto" onclick="document.getElementById('file-${i}').click()">📷 <span id="txt-foto-${i}">Fotos</span></button>
+                        <div id="preview-${i}" class="preview-fotos"></div>
+                    </div>
+                </div>`;
         });
-        container.innerHTML = html + (currentTit ? `</tbody></table></div>` : 'Sin preguntas registradas.');
+        if (seccionIndex !== -1) html += `</div>`; 
+        area.innerHTML = html;
     }
 
-    async function guardarPregunta() {
-        const payload = { 
-            titulo: document.getElementById('p-tit').value, 
-            desglose: document.getElementById('p-des').value, 
-            pregunta: document.getElementById('p-pre').value, 
-            ponderacion: parseFloat(document.getElementById('p-pts').value),
-            tipo: tipoArea 
-        };
-        if(editandoId) await _supabase.from('configuracion_preguntas').update(payload).eq('id', editandoId);
-        else await _supabase.from('configuracion_preguntas').insert([payload]);
-        resetForm('p'); cargarPreguntas();
+    function actualizarPuntajeRealTime() {
+        let pObtTotal = 0, pPosTotal = 0, contestadas = 0, secStats = {};
+
+        preguntasFiltradas.forEach((p, i) => {
+            const isC = document.getElementById(`c-${i}`).checked;
+            const isNC = document.getElementById(`nc-${i}`).checked;
+            const card = document.querySelector(`.pregunta-card[data-idx="${i}"]`);
+            if (!card) return;
+            const secIdx = card.getAttribute('data-secidx');
+
+            if (!secStats[secIdx]) secStats[secIdx] = { obt: 0, pos: 0 };
+
+            if (isC || isNC) {
+                contestadas++;
+                const ptsPosibles = parseFloat(p.ponderacion);
+                pObtTotal += isC ? ptsPosibles : 0;
+                pPosTotal += ptsPosibles;
+                secStats[secIdx].obt += isC ? ptsPosibles : 0;
+                secStats[secIdx].pos += ptsPosibles;
+            }
+        });
+
+        // Calculamos el score basándonos en el 100% de la ponderación VISIBLE
+        const basePuntajeVisible = preguntasFiltradas.reduce((acc, curr) => acc + parseFloat(curr.ponderacion), 0);
+        const scoreGral = basePuntajeVisible > 0 ? ((pObtTotal / basePuntajeVisible) * 100).toFixed(1) : "0.0";
+        
+        document.getElementById('realtime-score').innerText = scoreGral;
+        document.getElementById('realtime-progress').innerText = contestadas;
+
+        Object.keys(secStats).forEach(sIdx => {
+            const label = document.getElementById(`score-sec-${sIdx}`);
+            const pSec = secStats[sIdx].pos > 0 ? ((secStats[sIdx].obt / secStats[sIdx].pos) * 100).toFixed(0) : "0";
+            label.innerText = `(${pSec}%)`;
+            label.style.color = pSec >= 90 ? "#2ecc71" : (pSec >= 70 ? "#f1c40f" : "#e74c3c");
+        });
     }
 
-    function prepararEdicionPregunta(p) {
-        document.getElementById('p-tit').value = p.titulo;
-        document.getElementById('p-des').value = p.desglose;
-        document.getElementById('p-pre').value = p.pregunta;
-        document.getElementById('p-pts').value = p.ponderacion;
-        editandoId = p.id;
-        document.getElementById('btn-save-pregunta').innerText = "💾 Guardar Cambios";
-        document.getElementById('btn-save-pregunta').className = "btn-action btn-orange";
-        window.scrollTo(0,0);
+    function manejarSeleccion(i) {
+        const input = document.getElementById(`file-${i}`);
+        if (!archivosAcumulados[i]) archivosAcumulados[i] = [];
+        archivosAcumulados[i] = [...archivosAcumulados[i], ...Array.from(input.files)];
+        actualizarVistaPrevia(i);
     }
 
-    // --- BODEGAS/RUTAS (FILTRADAS POR TIPO) ---
-    async function cargarBodegas() {
-        const { data } = await _supabase.from('bodegas').select('*').eq('tipo', tipoArea).order('localizacion');
-        document.getElementById('tbody-bodegas').innerHTML = data.map(b => `
-            <tr>
-                <td>${b.localizacion}</td><td>${b.departamento}</td><td><strong>${b.nombre}</strong></td>
-                <td>
-                    <button class="btn-icon edit-btn" onclick='prepararEdicionBodega(${JSON.stringify(b)})'>✏️</button>
-                    <button class="btn-icon del-btn" onclick="eliminarRegistro('bodegas','${b.id}')">🗑️</button>
-                </td>
-            </tr>`).join('');
+    function actualizarVistaPrevia(i) {
+        const div = document.getElementById(`preview-${i}`);
+        div.innerHTML = "";
+        const lista = archivosAcumulados[i] || [];
+        document.getElementById(`txt-foto-${i}`).innerText = lista.length > 0 ? `✓ ${lista.length} Fotos` : "Fotos";
+        lista.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const container = document.createElement("div");
+                container.className = "thumb-container";
+                container.innerHTML = `<img src="${e.target.result}" class="thumb"><button class="btn-del-foto" onclick="borrarFoto(${i}, ${index})">×</button>`;
+                div.appendChild(container);
+            }
+            reader.readAsDataURL(file);
+        });
     }
 
-    async function guardarBodega() {
-        const payload = { localizacion: document.getElementById('b-loc').value, departamento: document.getElementById('b-dep').value, nombre: document.getElementById('b-nom').value, tipo: tipoArea };
-        if(editandoId) await _supabase.from('bodegas').update(payload).eq('id', editandoId);
-        else await _supabase.from('bodegas').insert([payload]);
-        resetForm('b'); cargarBodegas();
+    function borrarFoto(pIdx, fIdx) { 
+        archivosAcumulados[pIdx].splice(fIdx, 1); 
+        actualizarVistaPrevia(pIdx); 
     }
 
-    function prepararEdicionBodega(b) {
-        document.getElementById('b-loc').value = b.localizacion;
-        document.getElementById('b-dep').value = b.departamento;
-        document.getElementById('b-nom').value = b.nombre;
-        editandoId = b.id;
-        document.getElementById('btn-save-bodega').innerText = "💾 Guardar Cambios";
-    }
+    async function enviarEvaluacion() {
+        const audId = document.getElementById('selectAuditor').value;
+        const bodId = document.getElementById('selectBodega').value;
+        const btn = document.getElementById('btn-finalizar');
+        
+        if (!audId || !bodId) return alert("⚠️ Selecciona Auditor y Ubicación.");
+        if (preguntasFiltradas.length === 0) return alert("No hay preguntas para evaluar.");
 
-    // --- AUDITORES (COMPARTIDOS O FILTRADOS) ---
-    async function cargarAuditores() {
-        const { data } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
-        document.getElementById('tbody-auditores').innerHTML = data.map(a => `
-            <tr><td><strong>${a.nombre}</strong></td><td>${a.puesto}</td><td>
-                <button class="btn-icon edit-btn" onclick='prepararEdicionAuditor(${JSON.stringify(a)})'>✏️</button>
-                <button class="btn-icon del-btn" onclick="eliminarRegistro('auditores','${a.id}')">🗑️</button>
-            </td></tr>`).join('');
-    }
+        btn.innerText = "⏳ Guardando...";
+        btn.disabled = true;
+        let pObt = 0, pTot = 0, respuestas = [];
 
-    async function guardarAuditor() {
-        const payload = { nombre: document.getElementById('a-nom').value, puesto: document.getElementById('a-pue').value };
-        if(editandoId) await _supabase.from('auditores').update(payload).eq('id', editandoId);
-        else await _supabase.from('auditores').insert([payload]);
-        resetForm('a'); cargarAuditores();
-    }
+        for (let i = 0; i < preguntasFiltradas.length; i++) {
+            const isC = document.getElementById(`c-${i}`).checked;
+            const isNC = document.getElementById(`nc-${i}`).checked;
+            
+            if (!isC && !isNC) {
+                alert("Por favor, conteste todas las preguntas visibles.");
+                btn.disabled = false;
+                btn.innerText = "💾 Guardar Evaluación";
+                return;
+            }
 
-    function prepararEdicionAuditor(a) {
-        document.getElementById('a-nom').value = a.nombre; document.getElementById('a-pue').value = a.puesto;
-        editandoId = a.id; document.getElementById('btn-save-auditor').innerText = "💾 Guardar Cambios";
-    }
+            const pts = isC ? parseFloat(preguntasFiltradas[i].ponderacion) : 0;
+            pObt += pts; 
+            pTot += parseFloat(preguntasFiltradas[i].ponderacion);
+            
+            let urls = [];
+            const fotos = archivosAcumulados[i] || [];
+            for (let f = 0; f < fotos.length; f++) {
+                const path = `ev_${Date.now()}_p${i}_f${f}.jpg`;
+                const { data } = await _supabase.storage.from('evidencias').upload(path, fotos[f]);
+                if (data) urls.push(_supabase.storage.from('evidencias').getPublicUrl(path).data.publicUrl);
+            }
+            respuestas.push({
+                pregunta_id: preguntasFiltradas[i].id, cumple: isC, puntos_obtenidos: pts,
+                observaciones: document.getElementById(`obs-${i}`).value, foto_url: urls.join(',')
+            });
+        }
 
-    function resetForm(prefix) {
-        editandoId = null;
-        if(prefix === 'p') { document.getElementById('p-pre').value = ''; document.getElementById('btn-save-pregunta').innerText = "Guardar Pregunta"; document.getElementById('btn-save-pregunta').className = "btn-action btn-green"; }
-        else if (prefix === 'b') { document.getElementById('b-loc').value = ''; document.getElementById('b-dep').value = ''; document.getElementById('b-nom').value = ''; document.getElementById('btn-save-bodega').innerText = "Registrar Unidad"; }
-        else { document.getElementById('a-nom').value = ''; document.getElementById('a-pue').value = ''; document.getElementById('btn-save-auditor').innerText = "Registrar Auditor"; }
-    }
+        const score = ((pObt / pTot) * 100).toFixed(2);
+        const { data: evData, error: evErr } = await _supabase.from('evaluaciones').insert([{
+            bodega_id: bodId, auditor_id: audId, calificacion_final: score, tipo: tipoAuditoria
+        }]).select();
 
-    async function eliminarRegistro(tabla, id) {
-        if(confirm("¿Eliminar registro?")) {
-            await _supabase.from(tabla).delete().eq('id', id);
-            if(tabla==='bodegas') cargarBodegas(); else if(tabla==='auditores') cargarAuditores(); else cargarPreguntas();
+        if (!evErr) {
+            await _supabase.from('respuestas').insert(respuestas.map(r => ({ ...r, evaluacion_id: evData[0].id })));
+            alert(`✅ Auditoría guardada con éxito: ${score}%`);
+            window.location.href = `menu_area.html?tipo=${tipoAuditoria}`;
+        } else {
+            btn.disabled = false;
+            btn.innerText = "💾 Guardar Evaluación";
+            alert("Error al guardar la evaluación.");
         }
     }
 
