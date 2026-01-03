@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Realizar Auditoría - Sistema de Bodegas</title>
+    <title>Realizar Auditoría - Sistema Pro</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --danger: #e74c3c; --bg: #f0f2f5; --accent: #3498db; }
@@ -12,11 +12,12 @@
             background: var(--bg); 
             margin: 0; 
             padding: 10px; 
-            padding-top: 70px; 
+            padding-top: 75px; 
             padding-bottom: 120px; 
         }
         .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         
+        /* Barra de Puntaje Flotante */
         .score-bar {
             position: fixed; top: 0; left: 0; width: 100%; background: var(--primary);
             color: white; padding: 10px 15px; z-index: 2000; display: flex;
@@ -40,17 +41,19 @@
         
         .header-info { background: #fff; padding: 15px; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 20px; }
         
+        /* Acordeón */
         .seccion-titulo { 
             background: var(--primary); color: white; padding: 12px; border-radius: 8px; 
-            margin-top: 20px; font-weight: bold; text-transform: uppercase; font-size: 0.9em; 
+            margin-top: 20px; font-weight: bold; text-transform: uppercase; font-size: 0.85em; 
             cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         .seccion-contenido { display: block; padding-top: 10px; }
         .seccion-contenido.hidden { display: none; }
 
         .desglose-titulo { font-weight: bold; color: #555; margin: 20px 0 10px 10px; border-left: 4px solid var(--success); padding-left: 10px; font-size: 1.1em; }
-        .pregunta-card { background: #fff; padding: 18px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #eee; }
+        .pregunta-card { background: #fff; padding: 18px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #eee; transition: 0.3s; }
         
         .opciones { display: flex; gap: 12px; margin: 15px 0; }
         .radio-btn { flex: 1; }
@@ -67,18 +70,19 @@
         .preview-fotos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         .thumb-container { position: relative; width: 70px; height: 70px; }
         .thumb { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
-        .btn-del-foto { position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 14px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .btn-del-foto { position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
 
         #btn-finalizar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; background: var(--primary); color: white; border: none; padding: 18px; border-radius: 50px; font-size: 1.2em; font-weight: bold; cursor: pointer; box-shadow: 0 5px 20px rgba(0,0,0,0.3); z-index: 1000; }
+        #btn-finalizar:disabled { background: #95a5a6; }
         select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 1em; background: #fff; margin-top: 5px; }
     </style>
 </head>
 <body>
 
 <div class="score-bar">
-    <a href="index.html" class="btn-inicio-flotante">⬅ Inicio</a>
+    <a id="btn-regresar" href="index.html" class="btn-inicio-flotante">⬅ Inicio</a>
     <div style="font-size: 0.85em;">Progreso: <span id="realtime-progress">0</span>/<span id="realtime-total-q">0</span></div>
-    <div style="font-size: 1.2em;">Puntaje: <span id="realtime-score">0.0</span>%</div>
+    <div style="font-size: 1.2em;"><span id="realtime-score">0.0</span>%</div>
 </div>
 
 <div class="container">
@@ -100,7 +104,6 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqY2t6YmVndHZpYW51cmZ2dWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxOTYzMzUsImV4cCI6MjA4Mjc3MjMzNX0.64zrKi0p1KiDwtBODLRf8O4sRvnn0o9QyoQUYHvVFd0';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Detectar tipo de auditoría por URL (?tipo=reparto)
     const urlParams = new URLSearchParams(window.location.search);
     const tipoAuditoria = urlParams.get('tipo') || 'almacen';
 
@@ -109,16 +112,14 @@
 
     async function init() {
         document.getElementById('tipo-area-display').innerText = `Auditoría de ${tipoAuditoria}`;
+        document.getElementById('btn-regresar').href = `menu_area.html?tipo=${tipoAuditoria}`;
         
-        // 1. Cargar Auditores
         const { data: a } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
         document.getElementById('selectAuditor').innerHTML = '<option value="">Selecciona Auditor...</option>' + a.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
 
-        // 2. Cargar Bodegas/Rutas filtradas por TIPO
         const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoAuditoria).order('localizacion');
         document.getElementById('selectBodega').innerHTML = '<option value="">Selecciona Unidad...</option>' + b.map(x => `<option value="${x.id}">${x.localizacion} | ${x.nombre}</option>`).join('');
 
-        // 3. Cargar Preguntas filtradas por TIPO
         const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoAuditoria);
         p.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
 
@@ -176,8 +177,7 @@
                         <button class="btn-foto" onclick="document.getElementById('file-${i}').click()">📷 <span id="txt-foto-${i}">Fotos</span></button>
                         <div id="preview-${i}" class="preview-fotos"></div>
                     </div>
-                </div>
-            `;
+                </div>`;
         });
         if (seccionIndex !== -1) html += `</div>`; 
         area.innerHTML = html;
@@ -290,10 +290,11 @@
 
         if (!evErr) {
             await _supabase.from('respuestas').insert(respuestas.map(r => ({ ...r, evaluacion_id: evData[0].id })));
-            alert(`✅ Auditoría de ${tipoAuditoria} guardada: ${score}%`);
-            location.reload();
+            alert(`✅ Auditoría de ${tipoAuditoria} guardada con éxito: ${score}%`);
+            window.location.href = `menu_area.html?tipo=${tipoAuditoria}`;
         } else {
             btn.disabled = false;
+            alert("Error al guardar la evaluación.");
         }
     }
 
