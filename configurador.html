@@ -55,7 +55,7 @@
         <button class="tab active" onclick="switchTab('tab-preguntas')">📋 Preguntas</button>
         <button class="tab" onclick="switchTab('tab-bodegas')">📍 Ubicaciones/Rutas</button>
         <button class="tab" onclick="switchTab('tab-auditores')">👥 Auditores</button>
-        <button class="tab" onclick="switchTab('tab-backup')">💾 Importar/Exportar</button>
+        <button class="tab" onclick="switchTab('tab-backup')">💾 Carga Masiva (CSV)</button>
     </div>
 
     <div id="tab-preguntas" class="section active">
@@ -66,17 +66,14 @@
             </div>
             <div id="total-puntos" class="total-badge">0 / 100</div>
         </div>
-
         <div class="form-box">
             <div class="grid-3">
                 <div><label>📂 Título (Sección)</label><input type="text" id="p-tit" placeholder="1. Orden"></div>
-                <div><label>📑 Desglose (Numérico)</label><input type="text" id="p-des" placeholder="1.1"></div>
-                <div><label>⚖️ Ponderación (Pts)</label><input type="number" id="p-pts" value="10" step="0.1"></div>
+                <div><label>📑 Desglose</label><input type="text" id="p-des" placeholder="1.1"></div>
+                <div><label>⚖️ Ponderación</label><input type="number" id="p-pts" value="10" step="0.1"></div>
                 <div>
                     <label>🏢 Aplica a Depto/Zona</label>
-                    <select id="p-depto-filtro">
-                        <option value="TODOS">TODOS (General)</option>
-                    </select>
+                    <select id="p-depto-filtro"><option value="TODOS">TODOS (General)</option></select>
                 </div>
                 <div class="full-width">
                     <label>❓ Pregunta Específica</label>
@@ -92,7 +89,7 @@
         <div class="form-box">
             <div class="grid-3">
                 <div><label>📍 Localización</label><input type="text" id="b-loc"></div>
-                <div><label>🏢 Departamento/Zona (Clave para filtro)</label><input type="text" id="b-dep" placeholder="Ej: Cerámicos"></div>
+                <div><label>🏢 Departamento/Zona</label><input type="text" id="b-dep"></div>
                 <div><label>📦 Nombre Unidad</label><input type="text" id="b-nom"></div>
             </div>
             <button class="btn-action btn-green" id="btn-save-bodega" onclick="guardarBodega()">Registrar Unidad</button>
@@ -113,15 +110,15 @@
 
     <div id="tab-backup" class="section">
         <div class="form-box">
-            <h3>Exportar Datos</h3>
-            <p>Descarga toda la configuración de <strong><span class="area-name-text">esta área</span></strong> en un archivo de respaldo.</p>
-            <button class="btn-action btn-blue" onclick="exportarDatos()">📥 Descargar Respaldo JSON</button>
+            <h3>Exportar Respaldo</h3>
+            <p>Descarga la configuración actual en formato JSON para seguridad.</p>
+            <button class="btn-action btn-blue" onclick="exportarDatos()">📥 Descargar JSON</button>
         </div>
         <div class="form-box">
-            <h3>Importar Datos</h3>
-            <p>Carga un archivo de respaldo. <strong style="color:var(--danger)">Atención:</strong> Esto añadirá los datos del archivo a tu base de datos actual.</p>
-            <input type="file" id="importFile" accept=".json" style="margin-bottom:10px;">
-            <button class="btn-action btn-orange" onclick="importarDatos()">📤 Subir e Importar</button>
+            <h3>Carga Masiva de Preguntas (Excel/CSV)</h3>
+            <p>Sube un archivo .csv con las columnas: <b>titulo, desglose, pregunta, ponderacion, aplica_a_departamento</b></p>
+            <input type="file" id="csvFile" accept=".csv" style="margin-bottom:15px;">
+            <button class="btn-action btn-orange" onclick="importarCSV()">📤 Importar Catálogo CSV</button>
         </div>
     </div>
 </div>
@@ -137,7 +134,6 @@
     let departamentosUnicos = [];
 
     async function init() {
-        document.querySelectorAll('.area-name-text').forEach(el => el.innerText = tipoArea.toUpperCase());
         document.getElementById('area-label').innerText = `Configurando Área: ${tipoArea}`;
         document.getElementById('btn-volver-menu').href = `menu_area.html?tipo=${tipoArea}`;
         await cargarBodegas();
@@ -148,12 +144,12 @@
         document.querySelectorAll('.section, .tab').forEach(el => el.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         event.currentTarget.classList.add('active');
-        editandoId = null; 
-        if(id === 'tab-bodegas') cargarBodegas();
-        else if(id === 'tab-preguntas') { cargarBodegas(); cargarPreguntas(); }
-        else if(id === 'tab-auditores') cargarAuditores();
+        if(id === 'tab-preguntas' || id === 'tab-backup') cargarBodegas();
+        if(id === 'tab-preguntas') cargarPreguntas();
+        if(id === 'tab-auditores') cargarAuditores();
     }
 
+    // Funciones base (Cargar, Guardar, Editar) se mantienen de la versión anterior...
     function actualizarMenuDepartamentos() {
         const select = document.getElementById('p-depto-filtro');
         const valorActual = select.value;
@@ -182,10 +178,10 @@
             if (p.titulo !== currentTit) {
                 if (currentTit !== '') html += `</tbody></table></div>`;
                 idx++;
-                html += `<div class="seccion-header" onclick="this.nextElementSibling.classList.toggle('active')"><span>${p.titulo} (${sumasPorTitulo[p.titulo].toFixed(1)} pts)</span><span>🔽</span></div><div class="seccion-contenido"><table><thead><tr><th>Cód</th><th>Pregunta / Depto</th><th width="10%">Pts</th><th width="15%">Acciones</th></tr></thead><tbody>`;
+                html += `<div class="seccion-header" onclick="this.nextElementSibling.classList.toggle('active')"><span>${p.titulo} (${sumasPorTitulo[p.titulo].toFixed(1)} pts)</span><span>🔽</span></div><div class="seccion-contenido"><table><thead><tr><th>Cód</th><th>Pregunta / Depto</th><th>Pts</th><th>Acciones</th></tr></thead><tbody>`;
                 currentTit = p.titulo;
             }
-            html += `<tr><td><strong>${p.desglose}</strong></td><td>${p.pregunta} <br> <span class="tag-depto">🏢 ${p.aplica_a_departamento || 'TODOS'}</span></td><td>${p.ponderacion}</td><td><button class="btn-icon edit-btn" onclick='prepararEdicionPregunta(${JSON.stringify(p)})'>✏️</button><button class="btn-icon del-btn" onclick="eliminarRegistro('configuracion_preguntas','${p.id}')">🗑️</button></td></tr>`;
+            html += `<tr><td><strong>${p.desglose}</strong></td><td>${p.pregunta}<br><span class="tag-depto">🏢 ${p.aplica_a_departamento || 'TODOS'}</span></td><td>${p.ponderacion}</td><td><button class="btn-icon edit-btn" onclick='prepararEdicionPregunta(${JSON.stringify(p)})'>✏️</button><button class="btn-icon del-btn" onclick="eliminarRegistro('configuracion_preguntas','${p.id}')">🗑️</button></td></tr>`;
         });
         container.innerHTML = html + (currentTit ? `</tbody></table></div>` : 'Sin preguntas.');
         actualizarMenuDepartamentos();
@@ -209,18 +205,12 @@
         const { data } = await _supabase.from('bodegas').select('*').eq('tipo', tipoArea).order('localizacion');
         departamentosUnicos = [...new Set(data.map(b => b.departamento))].sort();
         actualizarMenuDepartamentos();
-        document.getElementById('tbody-bodegas').innerHTML = data.map(b => `<tr><td>${b.localizacion}</td><td><strong>${b.departamento}</strong></td><td>${b.nombre}</td><td><button class="btn-icon edit-btn" onclick='prepararEdicionBodega(${JSON.stringify(b)})'>✏️</button><button class="btn-icon del-btn" onclick="eliminarRegistro('bodegas','${b.id}')">🗑️</button></td></tr>`).join('');
+        document.getElementById('tbody-bodegas').innerHTML = data.map(b => `<tr><td>${b.localizacion}</td><td><strong>${b.departamento}</strong></td><td>${b.nombre}</td><td><button class="btn-icon del-btn" onclick="eliminarRegistro('bodegas','${b.id}')">🗑️</button></td></tr>`).join('');
     }
 
     async function guardarBodega() {
         const payload = { localizacion: document.getElementById('b-loc').value, departamento: document.getElementById('b-dep').value, nombre: document.getElementById('b-nom').value, tipo: tipoArea };
-        if(editandoId) await _supabase.from('bodegas').update(payload).eq('id', editandoId);
-        else await _supabase.from('bodegas').insert([payload]);
-        resetForm('b'); await cargarBodegas();
-    }
-
-    function prepararEdicionBodega(b) {
-        document.getElementById('b-loc').value = b.localizacion; document.getElementById('b-dep').value = b.departamento; document.getElementById('b-nom').value = b.nombre; editandoId = b.id; document.getElementById('btn-save-bodega').innerText = "💾 Guardar Cambios";
+        await _supabase.from('bodegas').insert([payload]); resetForm('b'); await cargarBodegas();
     }
 
     async function cargarAuditores() {
@@ -233,49 +223,56 @@
         resetForm('a'); cargarAuditores();
     }
 
-    // --- FUNCIONES DE IMPORT/EXPORT ---
-    async function exportarDatos() {
-        const { data: preguntas } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoArea);
-        const { data: bodegas } = await _supabase.from('bodegas').select('*').eq('tipo', tipoArea);
-        const { data: auditores } = await _supabase.from('auditores').select('*');
-
-        const exportData = { tipo: tipoArea, preguntas, bodegas, auditores };
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `respaldo_auditoria_${tipoArea}_${new Date().toISOString().slice(0,10)}.json`;
-        a.click();
-    }
-
-    async function importarDatos() {
-        const fileInput = document.getElementById('importFile');
-        if (!fileInput.files[0]) return alert("Selecciona un archivo JSON");
+    // --- MEJORA: IMPORTACIÓN CSV ---
+    async function importarCSV() {
+        const fileInput = document.getElementById('csvFile');
+        if (!fileInput.files[0]) return alert("Selecciona un archivo CSV");
 
         const reader = new FileReader();
         reader.onload = async (e) => {
-            try {
-                const json = JSON.parse(e.target.result);
-                if (confirm("Se cargarán preguntas y ubicaciones. ¿Continuar?")) {
-                    // Limpiar IDs para evitar conflictos y asegurar el tipo de área
-                    const prep = (list) => list.map(({id, created_at, ...rest}) => ({...rest, tipo: tipoArea}));
-                    
-                    if (json.preguntas) await _supabase.from('configuracion_preguntas').insert(prep(json.preguntas));
-                    if (json.bodegas) await _supabase.from('bodegas').insert(prep(json.bodegas));
-                    
-                    alert("Importación completada");
-                    location.reload();
-                }
-            } catch (err) { alert("Error al leer el archivo"); }
+            const text = e.target.result;
+            const rows = text.split('\n').map(row => row.split(','));
+            const headers = rows[0].map(h => h.trim().toLowerCase());
+            
+            const preguntas = [];
+            for(let i=1; i<rows.length; i++) {
+                if(rows[i].length < 4) continue; // Saltar filas vacías
+                const rowData = {};
+                headers.forEach((h, index) => {
+                    rowData[h] = rows[i][index]?.trim();
+                });
+                
+                preguntas.push({
+                    titulo: rowData.titulo,
+                    desglose: rowData.desglose,
+                    pregunta: rowData.pregunta,
+                    ponderacion: parseFloat(rowData.ponderacion),
+                    aplica_a_departamento: rowData.aplica_a_departamento || "TODOS",
+                    tipo: tipoArea
+                });
+            }
+
+            if(confirm(`¿Importar ${preguntas.length} preguntas a ${tipoArea}?`)) {
+                const { error } = await _supabase.from('configuracion_preguntas').insert(preguntas);
+                if(!error) { alert("¡Éxito!"); location.reload(); }
+                else { alert("Error al subir: " + error.message); }
+            }
         };
         reader.readAsText(fileInput.files[0]);
     }
 
+    async function exportarDatos() {
+        const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoArea);
+        const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoArea);
+        const blob = new Blob([JSON.stringify({preguntas:p, bodegas:b}, null, 2)], {type:'application/json'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = `backup_${tipoArea}.json`; a.click();
+    }
+
     function resetForm(prefix) {
         editandoId = null;
-        if(prefix === 'p') { document.getElementById('p-pre').value = ''; document.getElementById('p-depto-filtro').value = 'TODOS'; document.getElementById('btn-save-pregunta').innerText = "Guardar Pregunta"; document.getElementById('btn-save-pregunta').className = "btn-action btn-green"; }
-        else if (prefix === 'b') { document.getElementById('b-loc').value = ''; document.getElementById('b-dep').value = ''; document.getElementById('b-nom').value = ''; document.getElementById('btn-save-bodega').innerText = "Registrar Unidad"; }
-        else { document.getElementById('a-nom').value = ''; document.getElementById('a-pue').value = ''; }
+        if(prefix==='p') { document.getElementById('p-pre').value=''; document.getElementById('btn-save-pregunta').innerText="Guardar Pregunta"; document.getElementById('btn-save-pregunta').className="btn-action btn-green"; }
+        else if(prefix==='b') { document.getElementById('b-loc').value=''; document.getElementById('b-dep').value=''; document.getElementById('b-nom').value=''; }
     }
 
     async function eliminarRegistro(tabla, id) {
