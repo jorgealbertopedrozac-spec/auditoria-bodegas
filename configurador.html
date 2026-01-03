@@ -72,7 +72,7 @@
                 <div><label>🏢 Depto</label><select id="p-depto-filtro"><option value="TODOS">TODOS</option></select></div>
                 <div class="full-width"><label>❓ Pregunta</label><textarea id="p-pre" rows="2"></textarea></div>
             </div>
-            <button class="btn-action btn-green" onclick="guardarPregunta()">Guardar Pregunta</button>
+            <button class="btn-action btn-green" id="btn-save-pregunta" onclick="guardarPregunta()">Guardar Pregunta</button>
         </div>
         <div id="render-preguntas-acordeon"></div>
     </div>
@@ -84,7 +84,7 @@
                 <div><label>🏢 Departamento</label><input type="text" id="b-dep"></div>
                 <div><label>📦 Nombre</label><input type="text" id="b-nom"></div>
             </div>
-            <button class="btn-action btn-green" onclick="guardarBodega()">Registrar Unidad</button>
+            <button class="btn-action btn-green" id="btn-save-bodega" onclick="guardarBodega()">Registrar Unidad</button>
         </div>
         <table><thead><tr><th>Localización</th><th>Departamento</th><th>Nombre</th><th>Acciones</th></tr></thead><tbody id="tbody-bodegas"></tbody></table>
     </div>
@@ -97,13 +97,13 @@
             </div>
             <button class="btn-action btn-green" onclick="guardarAuditor()">Registrar Auditor</button>
         </div>
-        <tbody id="tbody-auditores"></tbody>
+        <table><thead><tr><th>Nombre</th><th>Puesto</th><th>Acciones</th></tr></thead><tbody id="tbody-auditores"></tbody></table>
     </div>
 
     <div id="tab-backup" class="section">
         <div class="form-box">
             <h3>Excel / CSV (Solo Preguntas)</h3>
-            <p>Descarga la plantilla específica para <strong><span id="area-text-csv"></span></strong>, llénala e impórtala.</p>
+            <p>Descarga la plantilla específica para: <strong id="area-text-csv" style="color:var(--secondary)"></strong></p>
             <button class="btn-action btn-outline" onclick="descargarPlantillaCSV()">📄 Descargar Plantilla CSV</button>
             <hr>
             <input type="file" id="csvFile" accept=".csv" style="margin-bottom:10px;">
@@ -112,9 +112,10 @@
         
         <div class="form-box">
             <h3>Respaldo Total JSON (Preguntas + Ubicaciones)</h3>
-            <p>Guarda o restaura la configuración completa del área actual.</p>
+            <p>Guarda o restaura la configuración completa de esta área.</p>
             <button class="btn-action btn-blue" onclick="exportarDatos()">📥 Exportar Respaldo JSON</button>
             <hr>
+            <label style="font-size: 0.8em; color: gray;">Seleccionar archivo para restaurar:</label>
             <input type="file" id="jsonFile" accept=".json" style="margin-bottom:10px;">
             <button class="btn-action btn-green" onclick="importarJSON()">📥 Restaurar Respaldo JSON</button>
         </div>
@@ -126,12 +127,12 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqY2t6YmVndHZpYW51cmZ2dWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxOTYzMzUsImV4cCI6MjA4Mjc3MjMzNX0.64zrKi0p1KiDwtBODLRf8O4sRvnn0o9QyoQUYHvVFd0';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const tipoArea = urlParams.get('tipo') || 'almacen';
+    const getAreaURL = () => new URLSearchParams(window.location.search).get('tipo') || 'almacen';
     let editandoId = null;
     let departamentosUnicos = [];
 
     async function init() {
+        const tipoArea = getAreaURL();
         document.getElementById('area-label').innerText = `MODO CONFIGURACIÓN: ${tipoArea.toUpperCase()}`;
         document.getElementById('area-text-csv').innerText = tipoArea.toUpperCase();
         document.getElementById('btn-volver-menu').href = `menu_area.html?tipo=${tipoArea}`;
@@ -143,58 +144,65 @@
         document.querySelectorAll('.section, .tab').forEach(el => el.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         event.currentTarget.classList.add('active');
+        const tipoArea = getAreaURL();
         if(id === 'tab-backup') document.getElementById('area-text-csv').innerText = tipoArea.toUpperCase();
     }
 
-    // --- MEJORA: DESCARGA DE PLANTILLA POR ÁREA ---
+    // --- MEJORA: DESCARGA DE PLANTILLA CSV ---
     function descargarPlantillaCSV() {
+        const areaActual = getAreaURL();
         const headers = "titulo,desglose,pregunta,ponderacion,aplica_a_departamento";
-        const ejemplo = tipoArea === 'almacen' 
-            ? "\n1. SEGURIDAD,1.1,¿Usa EPP completo?,20,TODOS"
-            : "\n1. UNIDAD,1.1,¿Limpieza de cabina?,15,REPARTO";
+        const ejemplo = areaActual === 'almacen' 
+            ? "\n1. ALMACEN EJEMPLO,1.1,¿Los pasillos están libres?,10,TODOS"
+            : "\n1. REPARTO EJEMPLO,1.1,¿La unidad tiene combustible?,10,TODOS";
         
         const blob = new Blob([headers + ejemplo], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = `plantilla_${tipoArea}.csv`;
+        link.download = `plantilla_${areaActual}.csv`;
         link.click();
+        URL.revokeObjectURL(link.href);
     }
 
-    // --- MEJORA: EXPORTACIÓN JSON FILTRADA POR ÁREA ---
+    // --- MEJORA: EXPORTACIÓN JSON FILTRADA ---
     async function exportarDatos() {
-        // Solo traemos lo que corresponde al tipoArea actual
-        const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoArea);
-        const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoArea);
+        const areaActual = getAreaURL();
+        const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', areaActual);
+        const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', areaActual);
         
-        const dataExport = { area: tipoArea, preguntas: p, bodegas: b };
+        const dataExport = { area: areaActual, preguntas: p, bodegas: b };
         const blob = new Blob([JSON.stringify(dataExport, null, 2)], {type:'application/json'});
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `respaldo_${tipoArea}_${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `respaldo_${areaActual}.json`;
         a.click();
+        URL.revokeObjectURL(a.href);
     }
 
+    // --- MEJORA: IMPORTACIÓN JSON ---
     async function importarJSON() {
+        const areaActual = getAreaURL();
         const file = document.getElementById('jsonFile').files[0];
         if(!file) return alert("Selecciona un archivo JSON");
         const reader = new FileReader();
         reader.onload = async (e) => {
-            const content = JSON.parse(e.target.result);
-            // Validamos que el archivo coincida con el área
-            if(content.area !== tipoArea) {
-                if(!confirm(`Este respaldo parece ser de ${content.area}. ¿Quieres forzar la carga en ${tipoArea}?`)) return;
-            }
-            // Limpiar IDs para evitar duplicados y asignar tipo actual
-            const clean = (list) => list.map(({id, created_at, ...r}) => ({...r, tipo: tipoArea}));
-            if(content.preguntas) await _supabase.from('configuracion_preguntas').insert(clean(content.preguntas));
-            if(content.bodegas) await _supabase.from('bodegas').insert(clean(content.bodegas));
-            alert("Respaldo restaurado"); location.reload();
+            try {
+                const content = JSON.parse(e.target.result);
+                if(content.area !== areaActual) {
+                    if(!confirm(`Este respaldo es de ${content.area}. ¿Deseas cargarlo en ${areaActual}?`)) return;
+                }
+                const clean = (list) => list.map(({id, created_at, ...r}) => ({...r, tipo: areaActual}));
+                if(content.preguntas) await _supabase.from('configuracion_preguntas').insert(clean(content.preguntas));
+                if(content.bodegas) await _supabase.from('bodegas').insert(clean(content.bodegas));
+                alert("Respaldo restaurado con éxito"); location.reload();
+            } catch(err) { alert("Archivo JSON inválido"); }
         };
         reader.readAsText(file);
     }
 
     // --- IMPORTACIÓN CSV ---
     async function importarCSV() {
+        const areaActual = getAreaURL();
         const fileInput = document.getElementById('csvFile');
         if (!fileInput.files[0]) return alert("Selecciona un archivo CSV");
         const reader = new FileReader();
@@ -210,16 +218,17 @@
                 preguntas.push({
                     titulo: rowData.titulo, desglose: rowData.desglose, pregunta: rowData.pregunta,
                     ponderacion: parseFloat(rowData.ponderacion), aplica_a_departamento: rowData.aplica_a_departamento || "TODOS",
-                    tipo: tipoArea // Forzamos el área actual
+                    tipo: areaActual
                 });
             }
             const { error } = await _supabase.from('configuracion_preguntas').insert(preguntas);
             if(!error) { alert("Catálogo actualizado"); location.reload(); }
+            else alert("Error: " + error.message);
         };
         reader.readAsText(fileInput.files[0]);
     }
 
-    // --- FUNCIONES DE APOYO (GUARDAR, CARGAR, ETC) ---
+    // --- CARGAS Y GUARDADOS ---
     function actualizarMenuDepartamentos() {
         const select = document.getElementById('p-depto-filtro');
         const val = select.value;
@@ -229,7 +238,8 @@
     }
 
     async function cargarPreguntas() {
-        const { data } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoArea);
+        const areaActual = getAreaURL();
+        const { data } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', areaActual);
         data.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
         const container = document.getElementById('render-preguntas-acordeon');
         const resumen = document.getElementById('desglose-sumas');
@@ -252,37 +262,57 @@
             }
             html += `<tr><td><strong>${p.desglose}</strong></td><td>${p.pregunta}<br><span class="tag-depto">🏢 ${p.aplica_a_departamento || 'TODOS'}</span></td><td>${p.ponderacion}</td><td><button class="btn-icon edit-btn" onclick='prepararEdicionPregunta(${JSON.stringify(p)})'>✏️</button><button class="btn-icon del-btn" onclick="eliminarRegistro('configuracion_preguntas','${p.id}')">🗑️</button></td></tr>`;
         });
-        container.innerHTML = html + (cur ? `</tbody></table></div>` : 'Vacío.');
+        container.innerHTML = html + (cur ? `</tbody></table></div>` : 'Sin datos.');
         actualizarMenuDepartamentos();
     }
 
     async function guardarPregunta() {
+        const areaActual = getAreaURL();
         const depto = document.getElementById('p-depto-filtro').value;
-        const payload = { titulo: document.getElementById('p-tit').value, desglose: document.getElementById('p-des').value, pregunta: document.getElementById('p-pre').value, ponderacion: parseFloat(document.getElementById('p-pts').value), tipo: tipoArea, aplica_a_departamento: depto };
+        const payload = { titulo: document.getElementById('p-tit').value, desglose: document.getElementById('p-des').value, pregunta: document.getElementById('p-pre').value, ponderacion: parseFloat(document.getElementById('p-pts').value), tipo: areaActual, aplica_a_departamento: depto };
         if(editandoId) await _supabase.from('configuracion_preguntas').update(payload).eq('id', editandoId);
         else await _supabase.from('configuracion_preguntas').insert([payload]);
         resetForm('p'); cargarPreguntas();
     }
 
+    function prepararEdicionPregunta(p) {
+        document.getElementById('p-tit').value = p.titulo; document.getElementById('p-des').value = p.desglose; document.getElementById('p-pre').value = p.pregunta; document.getElementById('p-pts').value = p.ponderacion;
+        setTimeout(() => { document.getElementById('p-depto-filtro').value = p.aplica_a_departamento || 'TODOS'; }, 100);
+        editandoId = p.id; document.getElementById('btn-save-pregunta').innerText = "💾 Guardar Cambios"; document.getElementById('btn-save-pregunta').className = "btn-action btn-orange"; window.scrollTo(0,0);
+    }
+
     async function cargarBodegas() {
-        const { data } = await _supabase.from('bodegas').select('*').eq('tipo', tipoArea).order('localizacion');
+        const areaActual = getAreaURL();
+        const { data } = await _supabase.from('bodegas').select('*').eq('tipo', areaActual).order('localizacion');
         departamentosUnicos = [...new Set(data.map(b => b.departamento))].sort();
         actualizarMenuDepartamentos();
         document.getElementById('tbody-bodegas').innerHTML = data.map(b => `<tr><td>${b.localizacion}</td><td><strong>${b.departamento}</strong></td><td>${b.nombre}</td><td><button class="btn-icon del-btn" onclick="eliminarRegistro('bodegas','${b.id}')">🗑️</button></td></tr>`).join('');
     }
 
     async function guardarBodega() {
-        const payload = { localizacion: document.getElementById('b-loc').value, departamento: document.getElementById('b-dep').value, nombre: document.getElementById('b-nom').value, tipo: tipoArea };
-        await _supabase.from('bodegas').insert([payload]); cargarBodegas();
+        const areaActual = getAreaURL();
+        const payload = { localizacion: document.getElementById('b-loc').value, departamento: document.getElementById('b-dep').value, nombre: document.getElementById('b-nom').value, tipo: areaActual };
+        await _supabase.from('bodegas').insert([payload]); resetForm('b'); await cargarBodegas();
+    }
+
+    async function cargarAuditores() {
+        const { data } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
+        document.getElementById('tbody-auditores').innerHTML = data.map(a => `<tr><td>${a.nombre}</td><td>${a.puesto}</td><td><button class="btn-icon del-btn" onclick="eliminarRegistro('auditores','${a.id}')">🗑️</button></td></tr>`).join('');
+    }
+
+    async function guardarAuditor() {
+        await _supabase.from('auditores').insert([{ nombre: document.getElementById('a-nom').value, puesto: document.getElementById('a-pue').value }]);
+        resetForm('a'); cargarAuditores();
     }
 
     function resetForm(prefix) {
         editandoId = null;
-        if(prefix==='p') { document.getElementById('p-pre').value=''; document.getElementById('p-tit').value=''; document.getElementById('p-des').value=''; }
+        if(prefix==='p') { document.getElementById('p-pre').value=''; document.getElementById('p-tit').value=''; document.getElementById('p-des').value=''; document.getElementById('btn-save-pregunta').innerText="Guardar Pregunta"; document.getElementById('btn-save-pregunta').className="btn-action btn-green"; }
+        else if(prefix==='b') { document.getElementById('b-loc').value=''; document.getElementById('b-dep').value=''; document.getElementById('b-nom').value=''; }
     }
 
     async function eliminarRegistro(tabla, id) {
-        if(confirm("¿Eliminar?")) { await _supabase.from(tabla).delete().eq('id', id); location.reload(); }
+        if(confirm("¿Eliminar registro?")) { await _supabase.from(tabla).delete().eq('id', id); location.reload(); }
     }
 
     init();
