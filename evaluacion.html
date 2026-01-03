@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Realizar Auditoría Dinámica - Sistema Pro</title>
+    <title>Realizar Auditoría Pro - Dinámica</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --danger: #e74c3c; --bg: #f0f2f5; --accent: #3498db; }
@@ -17,7 +17,6 @@
         }
         .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         
-        /* Barra de Puntaje Flotante */
         .score-bar {
             position: fixed; top: 0; left: 0; width: 100%; background: var(--primary);
             color: white; padding: 10px 15px; z-index: 2000; display: flex;
@@ -41,7 +40,6 @@
         
         .header-info { background: #fff; padding: 15px; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 20px; }
         
-        /* Acordeón */
         .seccion-titulo { 
             background: var(--primary); color: white; padding: 12px; border-radius: 8px; 
             margin-top: 20px; font-weight: bold; text-transform: uppercase; font-size: 0.85em; 
@@ -69,6 +67,7 @@
         .btn-del-foto { position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
 
         #btn-finalizar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; background: var(--primary); color: white; border: none; padding: 18px; border-radius: 50px; font-size: 1.2em; font-weight: bold; cursor: pointer; box-shadow: 0 5px 20px rgba(0,0,0,0.3); z-index: 1000; }
+        #btn-finalizar:disabled { background: #95a5a6; }
         select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 1em; background: #fff; margin-top: 5px; }
     </style>
 </head>
@@ -76,7 +75,7 @@
 
 <div class="score-bar">
     <a id="btn-regresar" href="index.html" class="btn-inicio-flotante">⬅ Inicio</a>
-    <div style="font-size: 0.85em;">Preguntas: <span id="realtime-progress">0</span>/<span id="realtime-total-q">0</span></div>
+    <div style="font-size: 0.85em;">Progreso: <span id="realtime-progress">0</span>/<span id="realtime-total-q">0</span></div>
     <div style="font-size: 1.2em;"><span id="realtime-score">0.0</span>%</div>
 </div>
 
@@ -93,7 +92,7 @@
     </div>
 
     <div id="renderArea">
-        <p style="text-align: center; color: #7f8c8d; padding: 20px;">Seleccione una ubicación para cargar el checklist correspondiente.</p>
+        <p style="text-align: center; color: #7f8c8d; padding: 20px;">Por favor, seleccione una ubicación para cargar las preguntas.</p>
     </div>
 </div>
 
@@ -107,39 +106,42 @@
     const urlParams = new URLSearchParams(window.location.search);
     const tipoAuditoria = urlParams.get('tipo') || 'almacen';
 
-    let preguntasMaestras = []; // Todas las preguntas del área
-    let preguntasFiltradas = []; // Solo las que aplican al depto seleccionado
-    let bodegasMaestras = [];
+    let preguntasMaestras = []; // Todas las del área (almacen o reparto)
+    let preguntasFiltradas = []; // Solo las que aplican al depto/zona actual
+    let bodegasData = [];
     let archivosAcumulados = {};
 
     async function init() {
-        document.getElementById('tipo-area-display').innerText = `Auditoría de ${tipoAuditoria}`;
+        document.getElementById('tipo-area-display').innerText = `Área: ${tipoAuditoria}`;
         document.getElementById('btn-regresar').href = `menu_area.html?tipo=${tipoAuditoria}`;
         
-        // 1. Cargar Auditores
+        // Cargar Auditores
         const { data: a } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
         document.getElementById('selectAuditor').innerHTML = '<option value="">Selecciona Auditor...</option>' + a.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
 
-        // 2. Cargar Bodegas Maestras
+        // Cargar Bodegas del área
         const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoAuditoria).order('localizacion');
-        bodegasMaestras = b;
-        document.getElementById('selectBodega').innerHTML = '<option value="">Selecciona Unidad...</option>' + b.map(x => `<option value="${x.id}">${x.localizacion} | ${x.nombre}</option>`).join('');
+        bodegasData = b;
+        document.getElementById('selectBodega').innerHTML = '<option value="">Selecciona Ubicación...</option>' + b.map(x => `<option value="${x.id}">${x.localizacion} | ${x.departamento} | ${x.nombre}</option>`).join('');
 
-        // 3. Cargar Preguntas Maestras del área (Almacén o Reparto)
+        // Cargar TODAS las preguntas del área
         const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoAuditoria);
         preguntasMaestras = p.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
     }
 
     function filtrarYRenderizar() {
         const bodegaId = document.getElementById('selectBodega').value;
-        if (!bodegaId) return;
+        if (!bodegaId) {
+            document.getElementById('renderArea').innerHTML = '<p style="text-align: center; color: #7f8c8d; padding: 20px;">Seleccione una ubicación.</p>';
+            return;
+        }
 
-        const bodegaSeleccionada = bodegasMaestras.find(x => x.id == bodegaId);
-        const depto = bodegaSeleccionada.departamento;
+        const bodegaSel = bodegasData.find(x => x.id == bodegaId);
+        const deptoBodega = bodegaSel.departamento;
 
-        // Filtrar preguntas que sean "TODOS" o que coincidan exactamente con el depto de la bodega
+        // FILTRO: Solo preguntas para "TODOS" o que coincidan con el Depto/Zona de la bodega
         preguntasFiltradas = preguntasMaestras.filter(p => 
-            p.aplica_a_departamento === 'TODOS' || p.aplica_a_departamento === depto
+            p.aplica_a_departamento === 'TODOS' || p.aplica_a_departamento === deptoBodega
         );
 
         document.getElementById('realtime-total-q').innerText = preguntasFiltradas.length;
@@ -158,8 +160,8 @@
         const area = document.getElementById('renderArea');
         let html = '', uTit = '', uDes = '', seccionIndex = -1;
 
-        if(preguntas.length === 0) {
-            area.innerHTML = '<p style="text-align:center; color:var(--danger);">No hay preguntas configuradas para este departamento.</p>';
+        if (preguntas.length === 0) {
+            area.innerHTML = '<p style="text-align:center; color:var(--danger); padding:20px;">No hay preguntas configuradas para este departamento específico.</p>';
             return;
         }
 
@@ -196,7 +198,7 @@
                         </div>
                     </div>
                     <div class="evidencia-box">
-                        <input type="text" id="obs-${i}" class="input-obs" placeholder="Nota u observación...">
+                        <input type="text" id="obs-${i}" class="input-obs" placeholder="Observaciones...">
                         <input type="file" id="file-${i}" accept="image/*" multiple onchange="manejarSeleccion(${i})" style="display:none">
                         <button class="btn-foto" onclick="document.getElementById('file-${i}').click()">📷 <span id="txt-foto-${i}">Fotos</span></button>
                         <div id="preview-${i}" class="preview-fotos"></div>
@@ -229,11 +231,10 @@
             }
         });
 
-        // El score se calcula sobre el 100% de las preguntas filtradas (visibles)
-        // Para que siempre sume 100 independientemente de cuántas preguntas se quitaron
-        const totalPonderacionVisible = preguntasFiltradas.reduce((acc, curr) => acc + parseFloat(curr.ponderacion), 0);
+        // Calculamos el score basándonos en el 100% de la ponderación VISIBLE
+        const basePuntajeVisible = preguntasFiltradas.reduce((acc, curr) => acc + parseFloat(curr.ponderacion), 0);
+        const scoreGral = basePuntajeVisible > 0 ? ((pObtTotal / basePuntajeVisible) * 100).toFixed(1) : "0.0";
         
-        const scoreGral = totalPonderacionVisible > 0 ? ((pObtTotal / totalPonderacionVisible) * 100).toFixed(1) : "0.0";
         document.getElementById('realtime-score').innerText = scoreGral;
         document.getElementById('realtime-progress').innerText = contestadas;
 
@@ -249,7 +250,6 @@
         const input = document.getElementById(`file-${i}`);
         if (!archivosAcumulados[i]) archivosAcumulados[i] = [];
         archivosAcumulados[i] = [...archivosAcumulados[i], ...Array.from(input.files)];
-        input.value = ""; 
         actualizarVistaPrevia(i);
     }
 
@@ -270,17 +270,19 @@
         });
     }
 
-    function borrarFoto(preIdx, fotoIdx) {
-        archivosAcumulados[preIdx].splice(fotoIdx, 1);
-        actualizarVistaPrevia(preIdx);
+    function borrarFoto(pIdx, fIdx) { 
+        archivosAcumulados[pIdx].splice(fIdx, 1); 
+        actualizarVistaPrevia(pIdx); 
     }
 
     async function enviarEvaluacion() {
         const audId = document.getElementById('selectAuditor').value;
         const bodId = document.getElementById('selectBodega').value;
         const btn = document.getElementById('btn-finalizar');
-        if (!audId || !bodId) return alert("⚠️ Selecciona Auditor y Ubicación.");
         
+        if (!audId || !bodId) return alert("⚠️ Selecciona Auditor y Ubicación.");
+        if (preguntasFiltradas.length === 0) return alert("No hay preguntas para evaluar.");
+
         btn.innerText = "⏳ Guardando...";
         btn.disabled = true;
         let pObt = 0, pTot = 0, respuestas = [];
@@ -288,29 +290,29 @@
         for (let i = 0; i < preguntasFiltradas.length; i++) {
             const isC = document.getElementById(`c-${i}`).checked;
             const isNC = document.getElementById(`nc-${i}`).checked;
-            if (isC || isNC) {
-                const pts = isC ? parseFloat(preguntasFiltradas[i].ponderacion) : 0;
-                pObt += pts; 
-                pTot += parseFloat(preguntasFiltradas[i].ponderacion);
-                
-                let urls = [];
-                const fotos = archivosAcumulados[i] || [];
-                for (let f = 0; f < fotos.length; f++) {
-                    const path = `ev_${Date.now()}_p${i}_f${f}.jpg`;
-                    const { data } = await _supabase.storage.from('evidencias').upload(path, fotos[f]);
-                    if (data) urls.push(_supabase.storage.from('evidencias').getPublicUrl(path).data.publicUrl);
-                }
-                respuestas.push({
-                    pregunta_id: preguntasFiltradas[i].id, cumple: isC, puntos_obtenidos: pts,
-                    observaciones: document.getElementById(`obs-${i}`).value, foto_url: urls.join(',')
-                });
+            
+            if (!isC && !isNC) {
+                alert("Por favor, conteste todas las preguntas visibles.");
+                btn.disabled = false;
+                btn.innerText = "💾 Guardar Evaluación";
+                return;
             }
-        }
 
-        if (respuestas.length < preguntasFiltradas.length) {
-            alert("⚠️ Debes contestar todas las preguntas visibles.");
-            btn.disabled = false; btn.innerText = "💾 Guardar Evaluación";
-            return;
+            const pts = isC ? parseFloat(preguntasFiltradas[i].ponderacion) : 0;
+            pObt += pts; 
+            pTot += parseFloat(preguntasFiltradas[i].ponderacion);
+            
+            let urls = [];
+            const fotos = archivosAcumulados[i] || [];
+            for (let f = 0; f < fotos.length; f++) {
+                const path = `ev_${Date.now()}_p${i}_f${f}.jpg`;
+                const { data } = await _supabase.storage.from('evidencias').upload(path, fotos[f]);
+                if (data) urls.push(_supabase.storage.from('evidencias').getPublicUrl(path).data.publicUrl);
+            }
+            respuestas.push({
+                pregunta_id: preguntasFiltradas[i].id, cumple: isC, puntos_obtenidos: pts,
+                observaciones: document.getElementById(`obs-${i}`).value, foto_url: urls.join(',')
+            });
         }
 
         const score = ((pObt / pTot) * 100).toFixed(2);
@@ -320,10 +322,12 @@
 
         if (!evErr) {
             await _supabase.from('respuestas').insert(respuestas.map(r => ({ ...r, evaluacion_id: evData[0].id })));
-            alert(`✅ Auditoría de ${tipoAuditoria} guardada: ${score}%`);
+            alert(`✅ Auditoría guardada con éxito: ${score}%`);
             window.location.href = `menu_area.html?tipo=${tipoAuditoria}`;
         } else {
             btn.disabled = false;
+            btn.innerText = "💾 Guardar Evaluación";
+            alert("Error al guardar la evaluación.");
         }
     }
 
