@@ -33,7 +33,7 @@
         .seccion-header { background: #edf2f7; padding: 12px 18px; margin-top: 15px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: var(--primary); border-left: 5px solid var(--secondary); }
         .seccion-contenido { display: none; margin-bottom: 15px; border: 1px solid #edf2f7; border-top: none; border-radius: 0 0 8px 8px; overflow: hidden; }
         .seccion-contenido.active { display: block; }
-        table { width: 100%; border-collapse: collapse; background: white; }
+        table { width: 100%; border-collapse: collapse; background: white; margin-top: 10px; }
         th, td { text-align: left; padding: 12px 15px; border-bottom: 1px solid #edf2f7; font-size: 0.9em; }
         th { background: #f8fafc; color: #64748b; text-transform: uppercase; font-size: 0.75em; }
         .btn-icon { border: none; padding: 8px; border-radius: 6px; cursor: pointer; color: white; }
@@ -97,7 +97,16 @@
             </div>
             <button class="btn-action btn-green" onclick="guardarAuditor()">Registrar Auditor</button>
         </div>
-        <table><thead><tr><th>Nombre</th><th>Puesto</th><th>Acciones</th></tr></thead><tbody id="tbody-auditores"></tbody></table>
+        <table>
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Puesto</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-auditores"></tbody>
+        </table>
     </div>
 
     <div id="tab-backup" class="section">
@@ -135,31 +144,50 @@
         document.getElementById('area-text-csv').innerText = tipoArea.toUpperCase();
         document.getElementById('btn-volver-menu').href = `menu_area.html?tipo=${tipoArea}`;
         await cargarBodegas();
+        await cargarAuditores();
         cargarPreguntas();
     }
 
-    // --- MEJORA 1: DESCARGA CON BOM PARA EVITAR CARACTERES RAROS EN EXCEL ---
+    function switchTab(id) {
+        document.querySelectorAll('.section, .tab').forEach(el => el.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        event.currentTarget.classList.add('active');
+        if(id === 'tab-auditores') cargarAuditores();
+        if(id === 'tab-bodegas') cargarBodegas();
+        if(id === 'tab-preguntas') cargarPreguntas();
+    }
+
+    async function cargarAuditores() {
+        const { data, error } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
+        const tbody = document.getElementById('tbody-auditores');
+        if (data) {
+            tbody.innerHTML = data.map(a => `
+                <tr>
+                    <td><strong>${a.nombre}</strong></td>
+                    <td>${a.puesto}</td>
+                    <td>
+                        <button class="btn-icon del-btn" onclick="eliminarRegistro('auditores','${a.id}')">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    async function guardarAuditor() {
+        const nombre = document.getElementById('a-nom').value;
+        const puesto = document.getElementById('a-pue').value;
+        if(!nombre) return alert("Ingresa el nombre");
+        
+        await _supabase.from('auditores').insert([{ nombre, puesto, activo: true }]);
+        resetForm('a');
+        await cargarAuditores();
+    }
+
     async function descargarDatosCSV() {
         const areaActual = getAreaURL();
-        const { data: preguntas, error } = await _supabase
-            .from('configuracion_preguntas')
-            .select('titulo, desglose, pregunta, ponderacion, aplica_a_departamento')
-            .eq('tipo', areaActual);
-
-        if (error) return alert("Error al obtener datos: " + error.message);
-
+        const { data: preguntas } = await _supabase.from('configuracion_preguntas').select('titulo, desglose, pregunta, ponderacion, aplica_a_departamento').eq('tipo', areaActual);
         const headers = "titulo,desglose,pregunta,ponderacion,aplica_a_departamento\n";
-        const filasCsv = preguntas.map(p => {
-            return [
-                `"${p.titulo.replace(/"/g, '""')}"`,
-                `"${p.desglose.replace(/"/g, '""')}"`,
-                `"${p.pregunta.replace(/"/g, '""')}"`,
-                p.ponderacion,
-                `"${p.aplica_a_departamento.replace(/"/g, '""')}"`
-            ].join(",");
-        }).join("\n");
-
-        // El prefijo \uFEFF es el BOM (Byte Order Mark) que le dice a Excel que el archivo es UTF-8
+        const filasCsv = preguntas.map(p => [`"${p.titulo}"`, `"${p.desglose}"`, `"${p.pregunta}"`, p.ponderacion, `"${p.aplica_a_departamento}"`].join(",")).join("\n");
         const blob = new Blob(["\uFEFF" + headers + filasCsv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
@@ -167,85 +195,36 @@
         link.click();
     }
 
-    // --- MEJORA 2: IMPORTACIÓN FORZANDO UTF-8 ---
     async function importarCSV() {
         const areaActual = getAreaURL();
         const fileInput = document.getElementById('csvFile');
         if (!fileInput.files[0]) return alert("Selecciona un archivo CSV");
-        
         const reader = new FileReader();
         reader.onload = async (e) => {
-            const content = e.target.result;
-            const rows = content.split('\n');
+            const rows = e.target.result.split('\n');
             const headers = rows[0].split(',').map(h => h.trim().replace(/^\uFEFF/, '').toLowerCase());
             const preguntas = [];
-
             for(let i=1; i<rows.length; i++) {
                 const cols = rows[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
                 if(!cols || cols.length < 4) continue;
-                
                 let rowData = {};
                 headers.forEach((h, idx) => {
                     let val = cols[idx] ? cols[idx].trim() : "";
                     rowData[h] = val.replace(/^"|"$/g, '').replace(/""/g, '"');
                 });
-                
                 preguntas.push({
                     titulo: rowData.titulo, desglose: rowData.desglose, pregunta: rowData.pregunta,
                     ponderacion: parseFloat(rowData.ponderacion), aplica_a_departamento: rowData.aplica_a_departamento || "TODOS",
                     tipo: areaActual
                 });
             }
-            const { error } = await _supabase.from('configuracion_preguntas').insert(preguntas);
-            if(!error) { alert("Importación exitosa con acentos corregidos."); location.reload(); }
-            else alert("Error: " + error.message);
+            await _supabase.from('configuracion_preguntas').insert(preguntas);
+            location.reload();
         };
-        // Forzamos la lectura como UTF-8
         reader.readAsText(fileInput.files[0], "UTF-8");
     }
 
-    // --- EL RESTO DE FUNCIONES SE MANTIENE PARA FUNCIONAMIENTO ---
-    function switchTab(id) {
-        document.querySelectorAll('.section, .tab').forEach(el => el.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
-        event.currentTarget.classList.add('active');
-    }
-
-    async function exportarDatos() {
-        const areaActual = getAreaURL();
-        const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', areaActual);
-        const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', areaActual);
-        const dataExport = { area: areaActual, preguntas: p, bodegas: b };
-        const blob = new Blob([JSON.stringify(dataExport, null, 2)], {type:'application/json'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `respaldo_${areaActual}.json`;
-        a.click();
-    }
-
-    async function importarJSON() {
-        const areaActual = getAreaURL();
-        const file = document.getElementById('jsonFile').files[0];
-        if(!file) return alert("Selecciona JSON");
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const content = JSON.parse(e.target.result);
-            const clean = (list) => list.map(({id, created_at, ...r}) => ({...r, tipo: areaActual}));
-            if(content.preguntas) await _supabase.from('configuracion_preguntas').insert(clean(content.preguntas));
-            if(content.bodegas) await _supabase.from('bodegas').insert(clean(content.bodegas));
-            alert("Restaurado"); location.reload();
-        };
-        reader.readAsText(file);
-    }
-
-    function actualizarMenuDepartamentos() {
-        const select = document.getElementById('p-depto-filtro');
-        const val = select.value;
-        select.innerHTML = '<option value="TODOS">TODOS</option>';
-        departamentosUnicos.forEach(d => { if(d !== "TODOS") select.innerHTML += `<option value="${d}">${d}</option>`; });
-        if (departamentosUnicos.includes(val)) select.value = val;
-    }
-
+    // --- FUNCIONES DE PREGUNTAS Y BODEGAS ---
     async function cargarPreguntas() {
         const areaActual = getAreaURL();
         const { data } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', areaActual);
@@ -271,14 +250,19 @@
             }
             html += `<tr><td><strong>${p.desglose}</strong></td><td>${p.pregunta}<br><span class="tag-depto">🏢 ${p.aplica_a_departamento || 'TODOS'}</span></td><td>${p.ponderacion}</td><td><button class="btn-icon edit-btn" onclick='prepararEdicionPregunta(${JSON.stringify(p)})'>✏️</button><button class="btn-icon del-btn" onclick="eliminarRegistro('configuracion_preguntas','${p.id}')">🗑️</button></td></tr>`;
         });
-        container.innerHTML = html + (cur ? `</tbody></table></div>` : 'Vacío.');
+        container.innerHTML = html + (cur ? `</tbody></table></div>` : '');
         actualizarMenuDepartamentos();
     }
 
     async function guardarPregunta() {
-        const areaActual = getAreaURL();
-        const depto = document.getElementById('p-depto-filtro').value;
-        const payload = { titulo: document.getElementById('p-tit').value, desglose: document.getElementById('p-des').value, pregunta: document.getElementById('p-pre').value, ponderacion: parseFloat(document.getElementById('p-pts').value), tipo: areaActual, aplica_a_departamento: depto };
+        const payload = { 
+            titulo: document.getElementById('p-tit').value, 
+            desglose: document.getElementById('p-des').value, 
+            pregunta: document.getElementById('p-pre').value, 
+            ponderacion: parseFloat(document.getElementById('p-pts').value), 
+            tipo: getAreaURL(), 
+            aplica_a_departamento: document.getElementById('p-depto-filtro').value 
+        };
         if(editandoId) await _supabase.from('configuracion_preguntas').update(payload).eq('id', editandoId);
         else await _supabase.from('configuracion_preguntas').insert([payload]);
         resetForm('p'); cargarPreguntas();
@@ -286,38 +270,55 @@
 
     function prepararEdicionPregunta(p) {
         document.getElementById('p-tit').value = p.titulo; document.getElementById('p-des').value = p.desglose; document.getElementById('p-pre').value = p.pregunta; document.getElementById('p-pts').value = p.ponderacion;
-        setTimeout(() => { document.getElementById('p-depto-filtro').value = p.aplica_a_departamento || 'TODOS'; }, 100);
-        editandoId = p.id; document.getElementById('btn-save-pregunta').innerText = "💾 Guardar Cambios"; document.getElementById('btn-save-pregunta').className = "btn-action btn-orange"; window.scrollTo(0,0);
+        editandoId = p.id; document.getElementById('btn-save-pregunta').innerText = "💾 Guardar Cambios";
     }
 
     async function cargarBodegas() {
-        const areaActual = getAreaURL();
-        const { data } = await _supabase.from('bodegas').select('*').eq('tipo', areaActual).order('localizacion');
+        const { data } = await _supabase.from('bodegas').select('*').eq('tipo', getAreaURL()).order('localizacion');
         departamentosUnicos = [...new Set(data.map(b => b.departamento))].sort();
-        actualizarMenuDepartamentos();
         document.getElementById('tbody-bodegas').innerHTML = data.map(b => `<tr><td>${b.localizacion}</td><td><strong>${b.departamento}</strong></td><td>${b.nombre}</td><td><button class="btn-icon del-btn" onclick="eliminarRegistro('bodegas','${b.id}')">🗑️</button></td></tr>`).join('');
+        actualizarMenuDepartamentos();
     }
 
     async function guardarBodega() {
-        const areaActual = getAreaURL();
-        const payload = { localizacion: document.getElementById('b-loc').value, departamento: document.getElementById('b-dep').value, nombre: document.getElementById('b-nom').value, tipo: areaActual };
-        await _supabase.from('bodegas').insert([payload]); resetForm('b'); await cargarBodegas();
+        await _supabase.from('bodegas').insert([{ localizacion: document.getElementById('b-loc').value, departamento: document.getElementById('b-dep').value, nombre: document.getElementById('b-nom').value, tipo: getAreaURL() }]);
+        resetForm('b'); await cargarBodegas();
     }
 
-    async function cargarAuditores() {
-        const { data } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
-        document.getElementById('tbody-auditores').innerHTML = data.map(a => `<tr><td>${a.nombre}</td><td>${a.puesto}</td><td><button class="btn-icon del-btn" onclick="eliminarRegistro('auditores','${a.id}')">🗑️</button></td></tr>`).join('');
+    function actualizarMenuDepartamentos() {
+        const select = document.getElementById('p-depto-filtro');
+        const val = select.value;
+        select.innerHTML = '<option value="TODOS">TODOS</option>' + departamentosUnicos.map(d => `<option value="${d}">${d}</option>`).join('');
+        if (departamentosUnicos.includes(val)) select.value = val;
     }
 
-    async function guardarAuditor() {
-        await _supabase.from('auditores').insert([{ nombre: document.getElementById('a-nom').value, puesto: document.getElementById('a-pue').value }]);
-        resetForm('a'); cargarAuditores();
+    async function exportarDatos() {
+        const area = getAreaURL();
+        const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', area);
+        const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', area);
+        const blob = new Blob([JSON.stringify({area, preguntas:p, bodegas:b}, null, 2)], {type:'application/json'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `respaldo_${area}.json`; a.click();
+    }
+
+    async function importarJSON() {
+        const file = document.getElementById('jsonFile').files[0];
+        if(!file) return alert("Selecciona archivo");
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const c = JSON.parse(e.target.result);
+            const clean = (l) => l.map(({id, created_at, ...r}) => ({...r, tipo: getAreaURL()}));
+            if(c.preguntas) await _supabase.from('configuracion_preguntas').insert(clean(c.preguntas));
+            if(c.bodegas) await _supabase.from('bodegas').insert(clean(c.bodegas));
+            location.reload();
+        };
+        reader.readAsText(file);
     }
 
     function resetForm(prefix) {
         editandoId = null;
-        if(prefix==='p') { document.getElementById('p-pre').value=''; document.getElementById('p-tit').value=''; document.getElementById('p-des').value=''; document.getElementById('btn-save-pregunta').innerText="Guardar Pregunta"; document.getElementById('btn-save-pregunta').className="btn-action btn-green"; }
-        else if(prefix==='b') { document.getElementById('b-loc').value=''; document.getElementById('b-dep').value=''; document.getElementById('b-nom').value=''; }
+        if(prefix==='p') { document.getElementById('p-pre').value=''; document.getElementById('p-tit').value=''; document.getElementById('p-des').value=''; document.getElementById('btn-save-pregunta').innerText="Guardar Pregunta"; }
+        if(prefix==='b') { document.getElementById('b-loc').value=''; document.getElementById('b-dep').value=''; document.getElementById('b-nom').value=''; }
+        if(prefix==='a') { document.getElementById('a-nom').value=''; document.getElementById('a-pue').value=''; }
     }
 
     async function eliminarRegistro(tabla, id) {
