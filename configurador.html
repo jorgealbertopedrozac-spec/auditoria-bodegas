@@ -37,7 +37,19 @@
         .btn-icon { border: none; padding: 8px; border-radius: 6px; cursor: pointer; color: white; }
         .edit-btn { background: var(--warning); margin-right: 5px; }
         .del-btn { background: var(--danger); }
-        .tag-depto { font-size: 0.7em; background: #e2e8f0; color: #4a5568; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+        
+        /* ESTILO PARA LA MEJORA VISUAL */
+        .tag-depto { 
+            font-size: 0.7em; 
+            background: #e2e8f0; 
+            color: #4a5568; 
+            padding: 3px 8px; 
+            border-radius: 5px; 
+            font-weight: bold; 
+            display: inline-block;
+            margin-top: 5px;
+            border: 1px solid #cbd5e0;
+        }
     </style>
 </head>
 <body>
@@ -67,11 +79,11 @@
 
         <div class="form-box">
             <div class="grid-3">
-                <div><label>📂 Título (Sección)</label><input type="text" id="p-tit" placeholder="1. Orden"></div>
-                <div><label>📑 Desglose (Numérico)</label><input type="text" id="p-des" placeholder="1.1"></div>
+                <div><label>📂 Título (Sección)</label><input type="text" id="p-tit" placeholder="Ej: 1. Orden"></div>
+                <div><label>📑 Desglose (Código)</label><input type="text" id="p-des" placeholder="Ej: 1.1"></div>
                 <div><label>⚖️ Ponderación (Pts)</label><input type="number" id="p-pts" value="10" step="0.1"></div>
                 <div>
-                    <label>🏢 Aplica a Depto/Zona (Opcional)</label>
+                    <label>🏢 Aplica a Depto/Zona (Filtro)</label>
                     <input type="text" id="p-depto-filtro" placeholder="Vacío = TODOS">
                 </div>
                 <div class="full-width">
@@ -79,7 +91,7 @@
                     <textarea id="p-pre" rows="2"></textarea>
                 </div>
             </div>
-            <button class="btn-action btn-green" id="btn-save-pregunta" onclick="guardarPregunta()">Guardar Pregunta</button>
+            <button class="btn-action btn-green" id="btn-save-pregunta" onclick="guardarPregunta()">💾 Guardar Pregunta</button>
         </div>
         <div id="render-preguntas-acordeon"></div>
     </div>
@@ -88,7 +100,7 @@
         <div class="form-box">
             <div class="grid-3">
                 <div><label>📍 Localización</label><input type="text" id="b-loc"></div>
-                <div><label>🏢 Departamento/Zona (Clave para filtro)</label><input type="text" id="b-dep"></div>
+                <div><label>🏢 Departamento/Zona (Clave Filtro)</label><input type="text" id="b-dep"></div>
                 <div><label>📦 Nombre Unidad</label><input type="text" id="b-nom"></div>
             </div>
             <button class="btn-action btn-green" id="btn-save-bodega" onclick="guardarBodega()">Registrar Unidad</button>
@@ -118,7 +130,7 @@
     let editandoId = null;
 
     function init() {
-        document.getElementById('area-label').innerText = `Configurando Área: ${tipoArea}`;
+        document.getElementById('area-label').innerText = `Configurando: ${tipoArea}`;
         document.getElementById('btn-volver-menu').href = `menu_area.html?tipo=${tipoArea}`;
         cargarPreguntas();
     }
@@ -138,19 +150,19 @@
         data.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
 
         const container = document.getElementById('render-preguntas-acordeon');
-        const resumenSuma = document.getElementById('desglose-sumas');
+        const resumo = document.getElementById('desglose-sumas');
         const badgeTotal = document.getElementById('total-puntos');
 
-        let sumasPorTitulo = {}, totalGeneral = 0;
+        let sumasPorTitulo = {}, total = 0;
         data.forEach(p => {
             let pts = parseFloat(p.ponderacion) || 0;
             sumasPorTitulo[p.titulo] = (sumasPorTitulo[p.titulo] || 0) + pts;
-            totalGeneral += pts;
+            total += pts;
         });
 
-        badgeTotal.innerText = `${totalGeneral.toFixed(1)} / 100`;
-        badgeTotal.className = `total-badge ${totalGeneral.toFixed(1) == 100.0 ? 'puntos-ok' : 'puntos-error'}`;
-        resumenSuma.innerText = Object.keys(sumasPorTitulo).map(t => `${t}: ${sumasPorTitulo[t].toFixed(1)}`).join(' | ');
+        badgeTotal.innerText = `${total.toFixed(1)} / 100`;
+        badgeTotal.className = `total-badge ${total.toFixed(1) == 100.0 ? 'puntos-ok' : 'puntos-error'}`;
+        resumo.innerText = Object.keys(sumasPorTitulo).map(t => `${t}: ${sumasPorTitulo[t].toFixed(1)}`).join(' | ');
 
         let html = '', currentTit = '', idx = 0;
         data.forEach(p => {
@@ -163,17 +175,21 @@
                         <span>🔽</span>
                     </div>
                     <div class="seccion-contenido">
-                        <table><thead><tr><th>Cód</th><th>Pregunta / Depto</th><th width="10%">Pts</th><th width="15%">Acciones</th></tr></thead><tbody>`;
+                        <table><thead><tr><th width="10%">Cód</th><th>Pregunta / Aplicación</th><th width="10%">Pts</th><th width="15%">Acciones</th></tr></thead><tbody>`;
                 currentTit = p.titulo;
             }
-            html += `<tr><td><strong>${p.desglose}</strong></td>
-                <td>${p.pregunta} <br> <span class="tag-depto">🏢 ${p.aplica_a_departamento || 'TODOS'}</span></td>
-                <td>${p.ponderacion}</td><td>
-                <button class="btn-icon edit-btn" onclick='prepararEdicionPregunta(${JSON.stringify(p)})'>✏️</button>
-                <button class="btn-icon del-btn" onclick="eliminarRegistro('configuracion_preguntas','${p.id}')">🗑️</button>
-            </td></tr>`;
+            // AQUÍ ESTÁ LA MEJORA VISUAL: Etiqueta tag-depto
+            html += `<tr>
+                <td><strong>${p.desglose}</strong></td>
+                <td>${p.pregunta}<br><span class="tag-depto">📍 Aplicación: ${p.aplica_a_departamento || 'TODOS'}</span></td>
+                <td>${p.ponderacion}</td>
+                <td>
+                    <button class="btn-icon edit-btn" onclick='prepararEdicionPregunta(${JSON.stringify(p)})'>✏️</button>
+                    <button class="btn-icon del-btn" onclick="eliminarRegistro('configuracion_preguntas','${p.id}')">🗑️</button>
+                </td>
+            </tr>`;
         });
-        container.innerHTML = html + (currentTit ? `</tbody></table></div>` : 'Sin preguntas.');
+        container.innerHTML = html + (currentTit ? `</tbody></table></div>` : 'Sin registros.');
     }
 
     async function guardarPregunta() {
@@ -200,32 +216,20 @@
         window.scrollTo(0,0);
     }
 
-    // --- BODEGAS ---
     async function cargarBodegas() {
         const { data } = await _supabase.from('bodegas').select('*').eq('tipo', tipoArea).order('localizacion');
         document.getElementById('tbody-bodegas').innerHTML = data.map(b => `
             <tr><td>${b.localizacion}</td><td><strong>${b.departamento}</strong></td><td>${b.nombre}</td><td>
-                <button class="btn-icon edit-btn" onclick='prepararEdicionBodega(${JSON.stringify(b)})'>✏️</button>
                 <button class="btn-icon del-btn" onclick="eliminarRegistro('bodegas','${b.id}')">🗑️</button>
             </td></tr>`).join('');
     }
 
     async function guardarBodega() {
         const payload = { localizacion: document.getElementById('b-loc').value, departamento: document.getElementById('b-dep').value, nombre: document.getElementById('b-nom').value, tipo: tipoArea };
-        if(editandoId) await _supabase.from('bodegas').update(payload).eq('id', editandoId);
-        else await _supabase.from('bodegas').insert([payload]);
+        await _supabase.from('bodegas').insert([payload]);
         resetForm('b'); cargarBodegas();
     }
 
-    function prepararEdicionBodega(b) {
-        document.getElementById('b-loc').value = b.localizacion;
-        document.getElementById('b-dep').value = b.departamento;
-        document.getElementById('b-nom').value = b.nombre;
-        editandoId = b.id;
-        document.getElementById('btn-save-bodega').innerText = "💾 Guardar Cambios";
-    }
-
-    // --- AUDITORES ---
     async function cargarAuditores() {
         const { data } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
         document.getElementById('tbody-auditores').innerHTML = data.map(a => `<tr><td>${a.nombre}</td><td>${a.puesto}</td><td><button class="btn-icon del-btn" onclick="eliminarRegistro('auditores','${a.id}')">🗑️</button></td></tr>`).join('');
@@ -238,13 +242,13 @@
 
     function resetForm(prefix) {
         editandoId = null;
-        if(prefix === 'p') { document.getElementById('p-pre').value = ''; document.getElementById('p-depto-filtro').value = ''; document.getElementById('btn-save-pregunta').innerText = "Guardar Pregunta"; document.getElementById('btn-save-pregunta').className = "btn-action btn-green"; }
-        else if (prefix === 'b') { document.getElementById('b-loc').value = ''; document.getElementById('b-dep').value = ''; document.getElementById('b-nom').value = ''; document.getElementById('btn-save-bodega').innerText = "Registrar Unidad"; }
+        if(prefix === 'p') { document.getElementById('p-pre').value = ''; document.getElementById('p-depto-filtro').value = ''; document.getElementById('btn-save-pregunta').innerText = "💾 Guardar Pregunta"; document.getElementById('btn-save-pregunta').className = "btn-action btn-green"; }
+        else if (prefix === 'b') { document.getElementById('b-loc').value = ''; document.getElementById('b-dep').value = ''; document.getElementById('b-nom').value = ''; }
         else { document.getElementById('a-nom').value = ''; document.getElementById('a-pue').value = ''; }
     }
 
     async function eliminarRegistro(tabla, id) {
-        if(confirm("¿Eliminar?")) { await _supabase.from(tabla).delete().eq('id', id); location.reload(); }
+        if(confirm("¿Seguro?")) { await _supabase.from(tabla).delete().eq('id', id); location.reload(); }
     }
 
     init();
