@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Auditoría de Bodegas</title>
+    <title>Sistema de Auditoría Pro</title>
     <style>
         :root {
             --primary: #2c3e50;
             --secondary: #3498db;
             --accent: #27ae60;
+            --reparto: #8e44ad;
             --bg: #f4f7f6;
             --text: #34495e;
         }
@@ -25,13 +26,14 @@
         }
 
         .menu-container {
-            width: 90%;
-            max-width: 450px;
+            width: 95%;
+            max-width: 500px;
             text-align: center;
+            padding: 20px 0;
         }
 
         .header {
-            margin-bottom: 40px;
+            margin-bottom: 30px;
         }
 
         .header h1 {
@@ -42,91 +44,127 @@
 
         .header p {
             color: #7f8c8d;
-            margin-top: 10px;
+            margin-top: 5px;
         }
 
         .nav-grid {
             display: grid;
-            gap: 20px;
+            gap: 15px;
+        }
+
+        .section-label {
+            text-align: left;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #95a5a6;
+            text-transform: uppercase;
+            margin-top: 10px;
+            letter-spacing: 1px;
         }
 
         .nav-card {
             background: white;
-            padding: 25px;
+            padding: 20px;
             border-radius: 15px;
             text-decoration: none;
             color: var(--primary);
             display: flex;
-            flex-direction: column;
             align-items: center;
+            gap: 20px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.05);
             transition: transform 0.2s, box-shadow 0.2s;
             border: 1px solid #eee;
+            text-align: left;
+        }
+
+        .nav-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
         }
 
         .nav-card:active {
-            transform: scale(0.96);
-            background: #f9f9f9;
+            transform: scale(0.98);
         }
 
         .icon {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
+            font-size: 2rem;
+            min-width: 50px;
+            text-align: center;
         }
 
-        .nav-card h3 {
+        .info h3 {
             margin: 0;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
         }
 
-        .nav-card p {
-            margin: 5px 0 0 0;
-            font-size: 0.85rem;
+        .info p {
+            margin: 3px 0 0 0;
+            font-size: 0.8rem;
             color: #95a5a6;
         }
 
-        .footer {
-            margin-top: 40px;
-            font-size: 0.8rem;
-            color: #bdc3c7;
-        }
-
-        /* Colores distintivos por sección */
-        .card-eval { border-left: 6px solid var(--accent); }
+        /* Colores por Tipo */
+        .card-almacen { border-left: 6px solid var(--accent); }
+        .card-reparto { border-left: 6px solid var(--reparto); }
         .card-hist { border-left: 6px solid var(--secondary); }
         .card-conf { border-left: 6px solid #f39c12; }
+
+        .footer {
+            margin-top: 30px;
+            font-size: 0.75rem;
+            color: #bdc3c7;
+        }
     </style>
 </head>
 <body>
 
     <div class="menu-container">
         <div class="header">
-            <h1>Auditoría de Bodegas</h1>
-            <p>Panel de Gestión de Calidad</p>
+            <h1>Panel de Control</h1>
+            <p>Gestión de Calidad Multi-Área</p>
         </div>
 
         <div class="nav-grid">
-            <a href="evaluacion.html" class="nav-card card-eval">
-                <span class="icon">📝</span>
-                <h3>Nueva Evaluación</h3>
-                <p>Iniciar checklist semanal o extraordinario</p>
+            
+            <div class="section-label">Realizar Auditoría</div>
+            
+            <a href="evaluacion.html?tipo=almacen" class="nav-card card-almacen">
+                <span class="icon">🏬</span>
+                <div class="info">
+                    <h3>Auditoría de Almacén</h3>
+                    <p>Checklist de Orden, Limpieza y Stock</p>
+                </div>
             </a>
+
+            <a href="evaluacion.html?tipo=reparto" class="nav-card card-reparto">
+                <span class="icon">🚚</span>
+                <div class="info">
+                    <h3>Auditoría de Reparto</h3>
+                    <p>Checklist de Unidades, Rutas y Servicio</p>
+                </div>
+            </a>
+
+            <div class="section-label">Análisis y Gestión</div>
 
             <a href="historial.html" class="nav-card card-hist">
                 <span class="icon">📊</span>
-                <h3>Historial y Métricas</h3>
-                <p>Ver reportes, fotos y promedios mensuales</p>
+                <div class="info">
+                    <h3>Historial y Métricas</h3>
+                    <p>Ver reportes, fotos y tendencias</p>
+                </div>
             </a>
 
             <a href="configurador.html" class="nav-card card-conf">
                 <span class="icon">⚙️</span>
-                <h3>Configuración</h3>
-                <p>Administrar bodegas y catálogo de preguntas</p>
+                <div class="info">
+                    <h3>Configuración Maestro</h3>
+                    <p>Gestionar catálogos, áreas y auditores</p>
+                </div>
             </a>
         </div>
 
         <div class="footer">
-            Sistema Conectado a Supabase Cloud
+            Versión 2.0 - Conectado a Supabase
         </div>
     </div>
 
