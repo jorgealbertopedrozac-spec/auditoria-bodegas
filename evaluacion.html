@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Realizar Auditoría Pro - Dinámica</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -53,7 +53,7 @@
         .desglose-titulo { font-weight: bold; color: #555; margin: 20px 0 10px 10px; border-left: 4px solid var(--success); padding-left: 10px; font-size: 1.1em; }
         .pregunta-card { background: #fff; padding: 18px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #eee; transition: 0.3s; }
         
-        /* LAYOUT ORIGINAL DE BOTONES RADIO */
+        /* BOTONES ORIGINALES CONFORME / NO CONFORME */
         .opciones { display: flex; gap: 12px; margin: 15px 0; }
         .radio-btn { flex: 1; }
         .radio-btn input { display: none; }
@@ -188,7 +188,6 @@
                 uDes = p.desglose;
             }
 
-            // AQUI SE RESTAURA EL LAYOUT ORIGINAL DE LOS BOTONES
             html += `
                 <div class="pregunta-card" data-idx="${i}" data-secidx="${seccionIndex}">
                     <p style="margin-top:0;"><strong>${p.pregunta}</strong></p>
@@ -204,8 +203,8 @@
                     </div>
                     <div class="evidencia-box">
                         <input type="text" id="obs-${i}" class="input-obs" placeholder="Nota u observación...">
-                        <input type="file" id="file-${i}" accept="image/*" multiple onchange="manejarSeleccion(${i})" style="display:none">
-                        <button class="btn-foto" onclick="document.getElementById('file-${i}').click()">📷 <span id="txt-foto-${i}">Fotos</span></button>
+                        <input type="file" id="file-${i}" accept="image/*" capture="camera" multiple onchange="manejarSeleccion(${i})" style="display:none">
+                        <button class="btn-foto" onclick="document.getElementById('file-${i}').click()">📷 <span id="txt-foto-${i}">Tomar Foto</span></button>
                         <div id="preview-${i}" class="preview-fotos"></div>
                     </div>
                 </div>`;
@@ -262,7 +261,7 @@
         const div = document.getElementById(`preview-${i}`);
         div.innerHTML = "";
         const lista = archivosAcumulados[i] || [];
-        document.getElementById(`txt-foto-${i}`).innerText = lista.length > 0 ? `✓ ${lista.length} Fotos` : "Fotos";
+        document.getElementById(`txt-foto-${i}`).innerText = lista.length > 0 ? `✓ ${lista.length} Foto(s)` : "Tomar Foto";
         lista.forEach((file, index) => {
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -297,9 +296,8 @@
             const isNC = document.getElementById(`nc-${i}`).checked;
             
             if (!isC && !isNC) {
-                alert("Por favor, conteste todas las preguntas visibles.");
-                btn.disabled = false;
-                btn.innerText = "💾 Guardar Evaluación";
+                alert("Responde todas las preguntas antes de guardar.");
+                btn.disabled = false; btn.innerText = "💾 Guardar Evaluación";
                 return;
             }
 
