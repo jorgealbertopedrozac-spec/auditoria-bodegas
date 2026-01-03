@@ -25,6 +25,7 @@
         .btn-green { background: var(--accent); }
         .btn-orange { background: var(--warning); }
         .btn-blue { background: var(--secondary); }
+        .btn-outline { background: transparent; color: var(--secondary); border: 2px solid var(--secondary); margin-bottom: 10px;}
         .resumen-puntos { background: var(--primary); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
         .total-badge { font-size: 1.8em; font-weight: bold; padding: 5px 15px; border-radius: 8px; background: rgba(255,255,255,0.1); border: 2px solid transparent; }
         .puntos-ok { border-color: var(--accent); color: #2ecc71; }
@@ -110,15 +111,19 @@
 
     <div id="tab-backup" class="section">
         <div class="form-box">
-            <h3>Exportar Respaldo</h3>
-            <p>Descarga la configuración actual en formato JSON para seguridad.</p>
-            <button class="btn-action btn-blue" onclick="exportarDatos()">📥 Descargar JSON</button>
-        </div>
-        <div class="form-box">
             <h3>Carga Masiva de Preguntas (Excel/CSV)</h3>
-            <p>Sube un archivo .csv con las columnas: <b>titulo, desglose, pregunta, ponderacion, aplica_a_departamento</b></p>
+            <p>1. Descarga la plantilla para saber qué columnas usar.</p>
+            <button class="btn-action btn-outline" onclick="descargarPlantillaCSV()">📄 Descargar Plantilla CSV</button>
+            <hr>
+            <p>2. Sube tu archivo con las preguntas completas.</p>
             <input type="file" id="csvFile" accept=".csv" style="margin-bottom:15px;">
             <button class="btn-action btn-orange" onclick="importarCSV()">📤 Importar Catálogo CSV</button>
+        </div>
+        
+        <div class="form-box">
+            <h3>Respaldo Completo (JSON)</h3>
+            <p>Guarda una copia de seguridad de toda la configuración actual.</p>
+            <button class="btn-action btn-blue" onclick="exportarDatos()">📥 Descargar Respaldo</button>
         </div>
     </div>
 </div>
@@ -149,41 +154,89 @@
         if(id === 'tab-auditores') cargarAuditores();
     }
 
-    // Funciones base (Cargar, Guardar, Editar) se mantienen de la versión anterior...
+    // --- LÓGICA DE PLANTILLA CSV ---
+    function descargarPlantillaCSV() {
+        const headers = "titulo,desglose,pregunta,ponderacion,aplica_a_departamento";
+        const ejemplo = "\n1. SECCION EJEMPLO,1.1,¿La unidad se encuentra limpia?,10,TODOS";
+        const blob = new Blob([headers + ejemplo], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `plantilla_preguntas_${tipoArea}.csv`;
+        link.click();
+    }
+
+    // --- IMPORTACIÓN CSV ---
+    async function importarCSV() {
+        const fileInput = document.getElementById('csvFile');
+        if (!fileInput.files[0]) return alert("Selecciona un archivo CSV");
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const text = e.target.result;
+            const rows = text.split('\n');
+            const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
+            
+            const preguntas = [];
+            for(let i=1; i<rows.length; i++) {
+                const cols = rows[i].split(',');
+                if(cols.length < 4) continue;
+                
+                let rowData = {};
+                headers.forEach((h, idx) => rowData[h] = cols[idx]?.trim());
+                
+                preguntas.push({
+                    titulo: rowData.titulo,
+                    desglose: rowData.desglose,
+                    pregunta: rowData.pregunta,
+                    ponderacion: parseFloat(rowData.ponderacion),
+                    aplica_a_departamento: rowData.aplica_a_departamento || "TODOS",
+                    tipo: tipoArea
+                });
+            }
+
+            if(confirm(`¿Subir ${preguntas.length} preguntas a ${tipoArea}?`)) {
+                const { error } = await _supabase.from('configuracion_preguntas').insert(preguntas);
+                if(!error) { alert("Importación Exitosa"); location.reload(); }
+                else alert("Error: " + error.message);
+            }
+        };
+        reader.readAsText(fileInput.files[0]);
+    }
+
+    // --- RESTO DE FUNCIONES (Cargar, Guardar, Eliminar) ---
     function actualizarMenuDepartamentos() {
         const select = document.getElementById('p-depto-filtro');
-        const valorActual = select.value;
+        const val = select.value;
         select.innerHTML = '<option value="TODOS">TODOS (General)</option>';
         departamentosUnicos.forEach(d => { if(d !== "TODOS") select.innerHTML += `<option value="${d}">${d}</option>`; });
-        if (departamentosUnicos.includes(valorActual)) select.value = valorActual;
+        if (departamentosUnicos.includes(val)) select.value = val;
     }
 
     async function cargarPreguntas() {
         const { data } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoArea);
         data.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
         const container = document.getElementById('render-preguntas-acordeon');
-        const resumenSuma = document.getElementById('desglose-sumas');
-        const badgeTotal = document.getElementById('total-puntos');
-        let sumasPorTitulo = {}, totalGeneral = 0;
+        const resumen = document.getElementById('desglose-sumas');
+        const badge = document.getElementById('total-puntos');
+        let sumas = {}, total = 0;
         data.forEach(p => {
             let pts = parseFloat(p.ponderacion) || 0;
-            sumasPorTitulo[p.titulo] = (sumasPorTitulo[p.titulo] || 0) + pts;
-            totalGeneral += pts;
+            sumas[p.titulo] = (sumas[p.titulo] || 0) + pts;
+            total += pts;
         });
-        badgeTotal.innerText = `${totalGeneral.toFixed(1)} / 100`;
-        badgeTotal.className = `total-badge ${totalGeneral.toFixed(1) == 100.0 ? 'puntos-ok' : 'puntos-error'}`;
-        resumenSuma.innerText = Object.keys(sumasPorTitulo).map(t => `${t}: ${sumasPorTitulo[t].toFixed(1)}`).join(' | ');
-        let html = '', currentTit = '', idx = 0;
+        badge.innerText = `${total.toFixed(1)} / 100`;
+        badge.className = `total-badge ${total.toFixed(1) == 100.0 ? 'puntos-ok' : 'puntos-error'}`;
+        resumen.innerText = Object.keys(sumas).map(t => `${t}: ${sumas[t].toFixed(1)}`).join(' | ');
+        let html = '', cur = '';
         data.forEach(p => {
-            if (p.titulo !== currentTit) {
-                if (currentTit !== '') html += `</tbody></table></div>`;
-                idx++;
-                html += `<div class="seccion-header" onclick="this.nextElementSibling.classList.toggle('active')"><span>${p.titulo} (${sumasPorTitulo[p.titulo].toFixed(1)} pts)</span><span>🔽</span></div><div class="seccion-contenido"><table><thead><tr><th>Cód</th><th>Pregunta / Depto</th><th>Pts</th><th>Acciones</th></tr></thead><tbody>`;
-                currentTit = p.titulo;
+            if (p.titulo !== cur) {
+                if (cur !== '') html += `</tbody></table></div>`;
+                html += `<div class="seccion-header" onclick="this.nextElementSibling.classList.toggle('active')"><span>${p.titulo} (${sumas[p.titulo].toFixed(1)} pts)</span><span>🔽</span></div><div class="seccion-contenido"><table><thead><tr><th>Cód</th><th>Pregunta</th><th>Pts</th><th>Acciones</th></tr></thead><tbody>`;
+                cur = p.titulo;
             }
             html += `<tr><td><strong>${p.desglose}</strong></td><td>${p.pregunta}<br><span class="tag-depto">🏢 ${p.aplica_a_departamento || 'TODOS'}</span></td><td>${p.ponderacion}</td><td><button class="btn-icon edit-btn" onclick='prepararEdicionPregunta(${JSON.stringify(p)})'>✏️</button><button class="btn-icon del-btn" onclick="eliminarRegistro('configuracion_preguntas','${p.id}')">🗑️</button></td></tr>`;
         });
-        container.innerHTML = html + (currentTit ? `</tbody></table></div>` : 'Sin preguntas.');
+        container.innerHTML = html + (cur ? `</tbody></table></div>` : 'Vacío.');
         actualizarMenuDepartamentos();
     }
 
@@ -221,44 +274,6 @@
     async function guardarAuditor() {
         await _supabase.from('auditores').insert([{ nombre: document.getElementById('a-nom').value, puesto: document.getElementById('a-pue').value }]);
         resetForm('a'); cargarAuditores();
-    }
-
-    // --- MEJORA: IMPORTACIÓN CSV ---
-    async function importarCSV() {
-        const fileInput = document.getElementById('csvFile');
-        if (!fileInput.files[0]) return alert("Selecciona un archivo CSV");
-
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const text = e.target.result;
-            const rows = text.split('\n').map(row => row.split(','));
-            const headers = rows[0].map(h => h.trim().toLowerCase());
-            
-            const preguntas = [];
-            for(let i=1; i<rows.length; i++) {
-                if(rows[i].length < 4) continue; // Saltar filas vacías
-                const rowData = {};
-                headers.forEach((h, index) => {
-                    rowData[h] = rows[i][index]?.trim();
-                });
-                
-                preguntas.push({
-                    titulo: rowData.titulo,
-                    desglose: rowData.desglose,
-                    pregunta: rowData.pregunta,
-                    ponderacion: parseFloat(rowData.ponderacion),
-                    aplica_a_departamento: rowData.aplica_a_departamento || "TODOS",
-                    tipo: tipoArea
-                });
-            }
-
-            if(confirm(`¿Importar ${preguntas.length} preguntas a ${tipoArea}?`)) {
-                const { error } = await _supabase.from('configuracion_preguntas').insert(preguntas);
-                if(!error) { alert("¡Éxito!"); location.reload(); }
-                else { alert("Error al subir: " + error.message); }
-            }
-        };
-        reader.readAsText(fileInput.files[0]);
     }
 
     async function exportarDatos() {
