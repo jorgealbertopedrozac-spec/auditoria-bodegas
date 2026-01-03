@@ -53,7 +53,15 @@
         .desglose-titulo { font-weight: bold; color: #555; margin: 20px 0 10px 10px; border-left: 4px solid var(--success); padding-left: 10px; font-size: 1.1em; }
         .pregunta-card { background: #fff; padding: 18px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #eee; transition: 0.3s; }
         
-        .radio-btn label { display: block; text-align: center; padding: 12px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        /* LAYOUT ORIGINAL DE BOTONES RADIO */
+        .opciones { display: flex; gap: 12px; margin: 15px 0; }
+        .radio-btn { flex: 1; }
+        .radio-btn input { display: none; }
+        .radio-btn label { 
+            display: block; text-align: center; padding: 12px; border: 2px solid #ddd; 
+            border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.9em;
+            transition: 0.3s;
+        }
         .check-c:checked + label { background: var(--success); color: white; border-color: var(--success); }
         .check-nc:checked + label { background: var(--danger); color: white; border-color: var(--danger); }
 
@@ -92,7 +100,7 @@
     </div>
 
     <div id="renderArea">
-        <p style="text-align: center; color: #7f8c8d; padding: 20px;">Por favor, seleccione una ubicación para cargar las preguntas.</p>
+        <p style="text-align: center; color: #7f8c8d; padding: 20px;">Por favor, seleccione una ubicación para cargar el checklist correspondiente.</p>
     </div>
 </div>
 
@@ -106,25 +114,22 @@
     const urlParams = new URLSearchParams(window.location.search);
     const tipoAuditoria = urlParams.get('tipo') || 'almacen';
 
-    let preguntasMaestras = []; // Todas las del área (almacen o reparto)
-    let preguntasFiltradas = []; // Solo las que aplican al depto/zona actual
+    let preguntasMaestras = [];
+    let preguntasFiltradas = [];
     let bodegasData = [];
     let archivosAcumulados = {};
 
     async function init() {
-        document.getElementById('tipo-area-display').innerText = `Área: ${tipoAuditoria}`;
+        document.getElementById('tipo-area-display').innerText = `Auditoría de ${tipoAuditoria}`;
         document.getElementById('btn-regresar').href = `menu_area.html?tipo=${tipoAuditoria}`;
         
-        // Cargar Auditores
         const { data: a } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
         document.getElementById('selectAuditor').innerHTML = '<option value="">Selecciona Auditor...</option>' + a.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
 
-        // Cargar Bodegas del área
         const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoAuditoria).order('localizacion');
         bodegasData = b;
-        document.getElementById('selectBodega').innerHTML = '<option value="">Selecciona Ubicación...</option>' + b.map(x => `<option value="${x.id}">${x.localizacion} | ${x.departamento} | ${x.nombre}</option>`).join('');
+        document.getElementById('selectBodega').innerHTML = '<option value="">Selecciona Unidad...</option>' + b.map(x => `<option value="${x.id}">${x.localizacion} | ${x.nombre}</option>`).join('');
 
-        // Cargar TODAS las preguntas del área
         const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoAuditoria);
         preguntasMaestras = p.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
     }
@@ -139,7 +144,6 @@
         const bodegaSel = bodegasData.find(x => x.id == bodegaId);
         const deptoBodega = bodegaSel.departamento;
 
-        // FILTRO: Solo preguntas para "TODOS" o que coincidan con el Depto/Zona de la bodega
         preguntasFiltradas = preguntasMaestras.filter(p => 
             p.aplica_a_departamento === 'TODOS' || p.aplica_a_departamento === deptoBodega
         );
@@ -160,8 +164,8 @@
         const area = document.getElementById('renderArea');
         let html = '', uTit = '', uDes = '', seccionIndex = -1;
 
-        if (preguntas.length === 0) {
-            area.innerHTML = '<p style="text-align:center; color:var(--danger); padding:20px;">No hay preguntas configuradas para este departamento específico.</p>';
+        if(preguntas.length === 0) {
+            area.innerHTML = '<p style="text-align:center; color:var(--danger); padding:20px;">No hay preguntas configuradas para este departamento.</p>';
             return;
         }
 
@@ -184,6 +188,7 @@
                 uDes = p.desglose;
             }
 
+            // AQUI SE RESTAURA EL LAYOUT ORIGINAL DE LOS BOTONES
             html += `
                 <div class="pregunta-card" data-idx="${i}" data-secidx="${seccionIndex}">
                     <p style="margin-top:0;"><strong>${p.pregunta}</strong></p>
@@ -198,7 +203,7 @@
                         </div>
                     </div>
                     <div class="evidencia-box">
-                        <input type="text" id="obs-${i}" class="input-obs" placeholder="Observaciones...">
+                        <input type="text" id="obs-${i}" class="input-obs" placeholder="Nota u observación...">
                         <input type="file" id="file-${i}" accept="image/*" multiple onchange="manejarSeleccion(${i})" style="display:none">
                         <button class="btn-foto" onclick="document.getElementById('file-${i}').click()">📷 <span id="txt-foto-${i}">Fotos</span></button>
                         <div id="preview-${i}" class="preview-fotos"></div>
@@ -231,9 +236,8 @@
             }
         });
 
-        // Calculamos el score basándonos en el 100% de la ponderación VISIBLE
-        const basePuntajeVisible = preguntasFiltradas.reduce((acc, curr) => acc + parseFloat(curr.ponderacion), 0);
-        const scoreGral = basePuntajeVisible > 0 ? ((pObtTotal / basePuntajeVisible) * 100).toFixed(1) : "0.0";
+        const totalPonderacionVisible = preguntasFiltradas.reduce((acc, curr) => acc + parseFloat(curr.ponderacion), 0);
+        const scoreGral = totalPonderacionVisible > 0 ? ((pObtTotal / totalPonderacionVisible) * 100).toFixed(1) : "0.0";
         
         document.getElementById('realtime-score').innerText = scoreGral;
         document.getElementById('realtime-progress').innerText = contestadas;
@@ -250,6 +254,7 @@
         const input = document.getElementById(`file-${i}`);
         if (!archivosAcumulados[i]) archivosAcumulados[i] = [];
         archivosAcumulados[i] = [...archivosAcumulados[i], ...Array.from(input.files)];
+        input.value = ""; 
         actualizarVistaPrevia(i);
     }
 
@@ -270,9 +275,9 @@
         });
     }
 
-    function borrarFoto(pIdx, fIdx) { 
-        archivosAcumulados[pIdx].splice(fIdx, 1); 
-        actualizarVistaPrevia(pIdx); 
+    function borrarFoto(preIdx, fotoIdx) {
+        archivosAcumulados[preIdx].splice(fotoIdx, 1);
+        actualizarVistaPrevia(preIdx);
     }
 
     async function enviarEvaluacion() {
@@ -307,7 +312,10 @@
             for (let f = 0; f < fotos.length; f++) {
                 const path = `ev_${Date.now()}_p${i}_f${f}.jpg`;
                 const { data } = await _supabase.storage.from('evidencias').upload(path, fotos[f]);
-                if (data) urls.push(_supabase.storage.from('evidencias').getPublicUrl(path).data.publicUrl);
+                if (data) {
+                    const { data: pub } = _supabase.storage.from('evidencias').getPublicUrl(path);
+                    urls.push(pub.publicUrl);
+                }
             }
             respuestas.push({
                 pregunta_id: preguntasFiltradas[i].id, cumple: isC, puntos_obtenidos: pts,
