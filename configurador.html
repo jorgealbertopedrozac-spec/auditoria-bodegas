@@ -24,6 +24,7 @@
         .btn-action { width: 100%; padding: 12px; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
         .btn-green { background: var(--accent); }
         .btn-orange { background: var(--warning); }
+        .btn-blue { background: var(--secondary); }
         .resumen-puntos { background: var(--primary); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
         .total-badge { font-size: 1.8em; font-weight: bold; padding: 5px 15px; border-radius: 8px; background: rgba(255,255,255,0.1); border: 2px solid transparent; }
         .puntos-ok { border-color: var(--accent); color: #2ecc71; }
@@ -54,6 +55,7 @@
         <button class="tab active" onclick="switchTab('tab-preguntas')">📋 Preguntas</button>
         <button class="tab" onclick="switchTab('tab-bodegas')">📍 Ubicaciones/Rutas</button>
         <button class="tab" onclick="switchTab('tab-auditores')">👥 Auditores</button>
+        <button class="tab" onclick="switchTab('tab-backup')">💾 Importar/Exportar</button>
     </div>
 
     <div id="tab-preguntas" class="section active">
@@ -90,7 +92,7 @@
         <div class="form-box">
             <div class="grid-3">
                 <div><label>📍 Localización</label><input type="text" id="b-loc"></div>
-                <div><label>🏢 Departamento/Zona (Clave Filtro)</label><input type="text" id="b-dep" placeholder="Ej: Cerámicos"></div>
+                <div><label>🏢 Departamento/Zona (Clave para filtro)</label><input type="text" id="b-dep" placeholder="Ej: Cerámicos"></div>
                 <div><label>📦 Nombre Unidad</label><input type="text" id="b-nom"></div>
             </div>
             <button class="btn-action btn-green" id="btn-save-bodega" onclick="guardarBodega()">Registrar Unidad</button>
@@ -108,6 +110,20 @@
         </div>
         <table><thead><tr><th>Nombre</th><th>Puesto</th><th>Acciones</th></tr></thead><tbody id="tbody-auditores"></tbody></table>
     </div>
+
+    <div id="tab-backup" class="section">
+        <div class="form-box">
+            <h3>Exportar Datos</h3>
+            <p>Descarga toda la configuración de <strong><span class="area-name-text">esta área</span></strong> en un archivo de respaldo.</p>
+            <button class="btn-action btn-blue" onclick="exportarDatos()">📥 Descargar Respaldo JSON</button>
+        </div>
+        <div class="form-box">
+            <h3>Importar Datos</h3>
+            <p>Carga un archivo de respaldo. <strong style="color:var(--danger)">Atención:</strong> Esto añadirá los datos del archivo a tu base de datos actual.</p>
+            <input type="file" id="importFile" accept=".json" style="margin-bottom:10px;">
+            <button class="btn-action btn-orange" onclick="importarDatos()">📤 Subir e Importar</button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -121,9 +137,10 @@
     let departamentosUnicos = [];
 
     async function init() {
+        document.querySelectorAll('.area-name-text').forEach(el => el.innerText = tipoArea.toUpperCase());
         document.getElementById('area-label').innerText = `Configurando Área: ${tipoArea}`;
         document.getElementById('btn-volver-menu').href = `menu_area.html?tipo=${tipoArea}`;
-        await cargarBodegas(); // Cargamos bodegas primero para obtener los departamentos
+        await cargarBodegas();
         cargarPreguntas();
     }
 
@@ -133,62 +150,42 @@
         event.currentTarget.classList.add('active');
         editandoId = null; 
         if(id === 'tab-bodegas') cargarBodegas();
-        else if(id === 'tab-preguntas') { cargarBodegas(); cargarPreguntas(); } // Refrescar menú de deptos
-        else cargarAuditores();
+        else if(id === 'tab-preguntas') { cargarBodegas(); cargarPreguntas(); }
+        else if(id === 'tab-auditores') cargarAuditores();
     }
 
-    // ACTUALIZA EL MENÚ DESPLEGABLE DE LA PESTAÑA PREGUNTAS
     function actualizarMenuDepartamentos() {
         const select = document.getElementById('p-depto-filtro');
-        const valorActual = select.value; // Guardar selección por si estamos editando
-        
+        const valorActual = select.value;
         select.innerHTML = '<option value="TODOS">TODOS (General)</option>';
-        departamentosUnicos.forEach(d => {
-            if(d !== "TODOS") select.innerHTML += `<option value="${d}">${d}</option>`;
-        });
-        
+        departamentosUnicos.forEach(d => { if(d !== "TODOS") select.innerHTML += `<option value="${d}">${d}</option>`; });
         if (departamentosUnicos.includes(valorActual)) select.value = valorActual;
     }
 
     async function cargarPreguntas() {
         const { data } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoArea);
         data.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
-
         const container = document.getElementById('render-preguntas-acordeon');
         const resumenSuma = document.getElementById('desglose-sumas');
         const badgeTotal = document.getElementById('total-puntos');
-
         let sumasPorTitulo = {}, totalGeneral = 0;
         data.forEach(p => {
             let pts = parseFloat(p.ponderacion) || 0;
             sumasPorTitulo[p.titulo] = (sumasPorTitulo[p.titulo] || 0) + pts;
             totalGeneral += pts;
         });
-
         badgeTotal.innerText = `${totalGeneral.toFixed(1)} / 100`;
         badgeTotal.className = `total-badge ${totalGeneral.toFixed(1) == 100.0 ? 'puntos-ok' : 'puntos-error'}`;
         resumenSuma.innerText = Object.keys(sumasPorTitulo).map(t => `${t}: ${sumasPorTitulo[t].toFixed(1)}`).join(' | ');
-
         let html = '', currentTit = '', idx = 0;
         data.forEach(p => {
             if (p.titulo !== currentTit) {
                 if (currentTit !== '') html += `</tbody></table></div>`;
                 idx++;
-                html += `
-                    <div class="seccion-header" onclick="this.nextElementSibling.classList.toggle('active')">
-                        <span>${p.titulo} (${sumasPorTitulo[p.titulo].toFixed(1)} pts)</span>
-                        <span>🔽</span>
-                    </div>
-                    <div class="seccion-contenido">
-                        <table><thead><tr><th>Cód</th><th>Pregunta / Depto</th><th width="10%">Pts</th><th width="15%">Acciones</th></tr></thead><tbody>`;
+                html += `<div class="seccion-header" onclick="this.nextElementSibling.classList.toggle('active')"><span>${p.titulo} (${sumasPorTitulo[p.titulo].toFixed(1)} pts)</span><span>🔽</span></div><div class="seccion-contenido"><table><thead><tr><th>Cód</th><th>Pregunta / Depto</th><th width="10%">Pts</th><th width="15%">Acciones</th></tr></thead><tbody>`;
                 currentTit = p.titulo;
             }
-            html += `<tr><td><strong>${p.desglose}</strong></td>
-                <td>${p.pregunta} <br> <span class="tag-depto">🏢 ${p.aplica_a_departamento || 'TODOS'}</span></td>
-                <td>${p.ponderacion}</td><td>
-                <button class="btn-icon edit-btn" onclick='prepararEdicionPregunta(${JSON.stringify(p)})'>✏️</button>
-                <button class="btn-icon del-btn" onclick="eliminarRegistro('configuracion_preguntas','${p.id}')">🗑️</button>
-            </td></tr>`;
+            html += `<tr><td><strong>${p.desglose}</strong></td><td>${p.pregunta} <br> <span class="tag-depto">🏢 ${p.aplica_a_departamento || 'TODOS'}</span></td><td>${p.ponderacion}</td><td><button class="btn-icon edit-btn" onclick='prepararEdicionPregunta(${JSON.stringify(p)})'>✏️</button><button class="btn-icon del-btn" onclick="eliminarRegistro('configuracion_preguntas','${p.id}')">🗑️</button></td></tr>`;
         });
         container.innerHTML = html + (currentTit ? `</tbody></table></div>` : 'Sin preguntas.');
         actualizarMenuDepartamentos();
@@ -196,46 +193,23 @@
 
     async function guardarPregunta() {
         const depto = document.getElementById('p-depto-filtro').value;
-        const payload = { 
-            titulo: document.getElementById('p-tit').value, desglose: document.getElementById('p-des').value, 
-            pregunta: document.getElementById('p-pre').value, ponderacion: parseFloat(document.getElementById('p-pts').value),
-            tipo: tipoArea, aplica_a_departamento: depto
-        };
+        const payload = { titulo: document.getElementById('p-tit').value, desglose: document.getElementById('p-des').value, pregunta: document.getElementById('p-pre').value, ponderacion: parseFloat(document.getElementById('p-pts').value), tipo: tipoArea, aplica_a_departamento: depto };
         if(editandoId) await _supabase.from('configuracion_preguntas').update(payload).eq('id', editandoId);
         else await _supabase.from('configuracion_preguntas').insert([payload]);
         resetForm('p'); cargarPreguntas();
     }
 
     function prepararEdicionPregunta(p) {
-        document.getElementById('p-tit').value = p.titulo;
-        document.getElementById('p-des').value = p.desglose;
-        document.getElementById('p-pre').value = p.pregunta;
-        document.getElementById('p-pts').value = p.ponderacion;
-        
-        // Esperamos un momento para que el menú se llene antes de seleccionar el valor
-        setTimeout(() => {
-            document.getElementById('p-depto-filtro').value = p.aplica_a_departamento || 'TODOS';
-        }, 100);
-        
-        editandoId = p.id;
-        document.getElementById('btn-save-pregunta').innerText = "💾 Guardar Cambios";
-        document.getElementById('btn-save-pregunta').className = "btn-action btn-orange";
-        window.scrollTo(0,0);
+        document.getElementById('p-tit').value = p.titulo; document.getElementById('p-des').value = p.desglose; document.getElementById('p-pre').value = p.pregunta; document.getElementById('p-pts').value = p.ponderacion;
+        setTimeout(() => { document.getElementById('p-depto-filtro').value = p.aplica_a_departamento || 'TODOS'; }, 100);
+        editandoId = p.id; document.getElementById('btn-save-pregunta').innerText = "💾 Guardar Cambios"; document.getElementById('btn-save-pregunta').className = "btn-action btn-orange"; window.scrollTo(0,0);
     }
 
-    // --- BODEGAS ---
     async function cargarBodegas() {
         const { data } = await _supabase.from('bodegas').select('*').eq('tipo', tipoArea).order('localizacion');
-        
-        // Extraer departamentos únicos para el menú de preguntas
         departamentosUnicos = [...new Set(data.map(b => b.departamento))].sort();
         actualizarMenuDepartamentos();
-
-        document.getElementById('tbody-bodegas').innerHTML = data.map(b => `
-            <tr><td>${b.localizacion}</td><td><strong>${b.departamento}</strong></td><td>${b.nombre}</td><td>
-                <button class="btn-icon edit-btn" onclick='prepararEdicionBodega(${JSON.stringify(b)})'>✏️</button>
-                <button class="btn-icon del-btn" onclick="eliminarRegistro('bodegas','${b.id}')">🗑️</button>
-            </td></tr>`).join('');
+        document.getElementById('tbody-bodegas').innerHTML = data.map(b => `<tr><td>${b.localizacion}</td><td><strong>${b.departamento}</strong></td><td>${b.nombre}</td><td><button class="btn-icon edit-btn" onclick='prepararEdicionBodega(${JSON.stringify(b)})'>✏️</button><button class="btn-icon del-btn" onclick="eliminarRegistro('bodegas','${b.id}')">🗑️</button></td></tr>`).join('');
     }
 
     async function guardarBodega() {
@@ -246,14 +220,9 @@
     }
 
     function prepararEdicionBodega(b) {
-        document.getElementById('b-loc').value = b.localizacion;
-        document.getElementById('b-dep').value = b.departamento;
-        document.getElementById('b-nom').value = b.nombre;
-        editandoId = b.id;
-        document.getElementById('btn-save-bodega').innerText = "💾 Guardar Cambios";
+        document.getElementById('b-loc').value = b.localizacion; document.getElementById('b-dep').value = b.departamento; document.getElementById('b-nom').value = b.nombre; editandoId = b.id; document.getElementById('btn-save-bodega').innerText = "💾 Guardar Cambios";
     }
 
-    // --- AUDITORES ---
     async function cargarAuditores() {
         const { data } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
         document.getElementById('tbody-auditores').innerHTML = data.map(a => `<tr><td>${a.nombre}</td><td>${a.puesto}</td><td><button class="btn-icon del-btn" onclick="eliminarRegistro('auditores','${a.id}')">🗑️</button></td></tr>`).join('');
@@ -262,6 +231,44 @@
     async function guardarAuditor() {
         await _supabase.from('auditores').insert([{ nombre: document.getElementById('a-nom').value, puesto: document.getElementById('a-pue').value }]);
         resetForm('a'); cargarAuditores();
+    }
+
+    // --- FUNCIONES DE IMPORT/EXPORT ---
+    async function exportarDatos() {
+        const { data: preguntas } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoArea);
+        const { data: bodegas } = await _supabase.from('bodegas').select('*').eq('tipo', tipoArea);
+        const { data: auditores } = await _supabase.from('auditores').select('*');
+
+        const exportData = { tipo: tipoArea, preguntas, bodegas, auditores };
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `respaldo_auditoria_${tipoArea}_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+    }
+
+    async function importarDatos() {
+        const fileInput = document.getElementById('importFile');
+        if (!fileInput.files[0]) return alert("Selecciona un archivo JSON");
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const json = JSON.parse(e.target.result);
+                if (confirm("Se cargarán preguntas y ubicaciones. ¿Continuar?")) {
+                    // Limpiar IDs para evitar conflictos y asegurar el tipo de área
+                    const prep = (list) => list.map(({id, created_at, ...rest}) => ({...rest, tipo: tipoArea}));
+                    
+                    if (json.preguntas) await _supabase.from('configuracion_preguntas').insert(prep(json.preguntas));
+                    if (json.bodegas) await _supabase.from('bodegas').insert(prep(json.bodegas));
+                    
+                    alert("Importación completada");
+                    location.reload();
+                }
+            } catch (err) { alert("Error al leer el archivo"); }
+        };
+        reader.readAsText(fileInput.files[0]);
     }
 
     function resetForm(prefix) {
