@@ -56,32 +56,23 @@
         <button class="tab active" onclick="switchTab('tab-preguntas')">📋 Preguntas</button>
         <button class="tab" onclick="switchTab('tab-bodegas')">📍 Ubicaciones/Rutas</button>
         <button class="tab" onclick="switchTab('tab-auditores')">👥 Auditores</button>
-        <button class="tab" onclick="switchTab('tab-backup')">💾 Carga Masiva (CSV)</button>
+        <button class="tab" onclick="switchTab('tab-backup')">💾 Carga Masiva / Respaldo</button>
     </div>
 
     <div id="tab-preguntas" class="section active">
         <div class="resumen-puntos">
-            <div>
-                <strong>Puntaje Máximo Posible:</strong>
-                <div id="desglose-sumas" style="font-size: 0.8em; margin-top: 5px; color: #bdc3c7;">Calculando...</div>
-            </div>
+            <div><strong>Suma de Ponderación:</strong><div id="desglose-sumas" style="font-size: 0.8em; margin-top: 5px; color: #bdc3c7;">Calculando...</div></div>
             <div id="total-puntos" class="total-badge">0 / 100</div>
         </div>
         <div class="form-box">
             <div class="grid-3">
-                <div><label>📂 Título (Sección)</label><input type="text" id="p-tit" placeholder="1. Orden"></div>
-                <div><label>📑 Desglose</label><input type="text" id="p-des" placeholder="1.1"></div>
-                <div><label>⚖️ Ponderación</label><input type="number" id="p-pts" value="10" step="0.1"></div>
-                <div>
-                    <label>🏢 Aplica a Depto/Zona</label>
-                    <select id="p-depto-filtro"><option value="TODOS">TODOS (General)</option></select>
-                </div>
-                <div class="full-width">
-                    <label>❓ Pregunta Específica</label>
-                    <textarea id="p-pre" rows="2"></textarea>
-                </div>
+                <div><label>📂 Título</label><input type="text" id="p-tit"></div>
+                <div><label>📑 Código</label><input type="text" id="p-des"></div>
+                <div><label>⚖️ Puntos</label><input type="number" id="p-pts" value="10"></div>
+                <div><label>🏢 Depto</label><select id="p-depto-filtro"><option value="TODOS">TODOS</option></select></div>
+                <div class="full-width"><label>❓ Pregunta</label><textarea id="p-pre" rows="2"></textarea></div>
             </div>
-            <button class="btn-action btn-green" id="btn-save-pregunta" onclick="guardarPregunta()">Guardar Pregunta</button>
+            <button class="btn-action btn-green" onclick="guardarPregunta()">Guardar Pregunta</button>
         </div>
         <div id="render-preguntas-acordeon"></div>
     </div>
@@ -90,40 +81,42 @@
         <div class="form-box">
             <div class="grid-3">
                 <div><label>📍 Localización</label><input type="text" id="b-loc"></div>
-                <div><label>🏢 Departamento/Zona</label><input type="text" id="b-dep"></div>
-                <div><label>📦 Nombre Unidad</label><input type="text" id="b-nom"></div>
+                <div><label>🏢 Departamento</label><input type="text" id="b-dep"></div>
+                <div><label>📦 Nombre</label><input type="text" id="b-nom"></div>
             </div>
-            <button class="btn-action btn-green" id="btn-save-bodega" onclick="guardarBodega()">Registrar Unidad</button>
+            <button class="btn-action btn-green" onclick="guardarBodega()">Registrar Unidad</button>
         </div>
-        <table id="table-bodegas"><thead><tr><th>Localización</th><th>Depto/Zona</th><th>Nombre</th><th>Acciones</th></tr></thead><tbody id="tbody-bodegas"></tbody></table>
+        <table><thead><tr><th>Localización</th><th>Departamento</th><th>Nombre</th><th>Acciones</th></tr></thead><tbody id="tbody-bodegas"></tbody></table>
     </div>
 
     <div id="tab-auditores" class="section">
         <div class="form-box">
             <div class="grid-3">
-                <div><label>👤 Nombre Completo</label><input type="text" id="a-nom"></div>
+                <div><label>👤 Nombre</label><input type="text" id="a-nom"></div>
                 <div><label>💼 Puesto</label><input type="text" id="a-pue"></div>
             </div>
-            <button class="btn-action btn-green" id="btn-save-auditor" onclick="guardarAuditor()">Registrar Auditor</button>
+            <button class="btn-action btn-green" onclick="guardarAuditor()">Registrar Auditor</button>
         </div>
-        <table><thead><tr><th>Nombre</th><th>Puesto</th><th>Acciones</th></tr></thead><tbody id="tbody-auditores"></tbody></table>
+        <tbody id="tbody-auditores"></tbody>
     </div>
 
     <div id="tab-backup" class="section">
         <div class="form-box">
-            <h3>Carga Masiva de Preguntas (Excel/CSV)</h3>
-            <p>1. Descarga la plantilla para saber qué columnas usar.</p>
+            <h3>Excel / CSV (Solo Preguntas)</h3>
+            <p>Descarga la plantilla específica para <strong><span id="area-text-csv"></span></strong>, llénala e impórtala.</p>
             <button class="btn-action btn-outline" onclick="descargarPlantillaCSV()">📄 Descargar Plantilla CSV</button>
             <hr>
-            <p>2. Sube tu archivo con las preguntas completas.</p>
-            <input type="file" id="csvFile" accept=".csv" style="margin-bottom:15px;">
+            <input type="file" id="csvFile" accept=".csv" style="margin-bottom:10px;">
             <button class="btn-action btn-orange" onclick="importarCSV()">📤 Importar Catálogo CSV</button>
         </div>
         
         <div class="form-box">
-            <h3>Respaldo Completo (JSON)</h3>
-            <p>Guarda una copia de seguridad de toda la configuración actual.</p>
-            <button class="btn-action btn-blue" onclick="exportarDatos()">📥 Descargar Respaldo</button>
+            <h3>Respaldo Total JSON (Preguntas + Ubicaciones)</h3>
+            <p>Guarda o restaura la configuración completa del área actual.</p>
+            <button class="btn-action btn-blue" onclick="exportarDatos()">📥 Exportar Respaldo JSON</button>
+            <hr>
+            <input type="file" id="jsonFile" accept=".json" style="margin-bottom:10px;">
+            <button class="btn-action btn-green" onclick="importarJSON()">📥 Restaurar Respaldo JSON</button>
         </div>
     </div>
 </div>
@@ -139,7 +132,8 @@
     let departamentosUnicos = [];
 
     async function init() {
-        document.getElementById('area-label').innerText = `Configurando Área: ${tipoArea}`;
+        document.getElementById('area-label').innerText = `MODO CONFIGURACIÓN: ${tipoArea.toUpperCase()}`;
+        document.getElementById('area-text-csv').innerText = tipoArea.toUpperCase();
         document.getElementById('btn-volver-menu').href = `menu_area.html?tipo=${tipoArea}`;
         await cargarBodegas();
         cargarPreguntas();
@@ -149,65 +143,87 @@
         document.querySelectorAll('.section, .tab').forEach(el => el.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         event.currentTarget.classList.add('active');
-        if(id === 'tab-preguntas' || id === 'tab-backup') cargarBodegas();
-        if(id === 'tab-preguntas') cargarPreguntas();
-        if(id === 'tab-auditores') cargarAuditores();
+        if(id === 'tab-backup') document.getElementById('area-text-csv').innerText = tipoArea.toUpperCase();
     }
 
-    // --- LÓGICA DE PLANTILLA CSV ---
+    // --- MEJORA: DESCARGA DE PLANTILLA POR ÁREA ---
     function descargarPlantillaCSV() {
         const headers = "titulo,desglose,pregunta,ponderacion,aplica_a_departamento";
-        const ejemplo = "\n1. SECCION EJEMPLO,1.1,¿La unidad se encuentra limpia?,10,TODOS";
+        const ejemplo = tipoArea === 'almacen' 
+            ? "\n1. SEGURIDAD,1.1,¿Usa EPP completo?,20,TODOS"
+            : "\n1. UNIDAD,1.1,¿Limpieza de cabina?,15,REPARTO";
+        
         const blob = new Blob([headers + ejemplo], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = `plantilla_preguntas_${tipoArea}.csv`;
+        link.download = `plantilla_${tipoArea}.csv`;
         link.click();
+    }
+
+    // --- MEJORA: EXPORTACIÓN JSON FILTRADA POR ÁREA ---
+    async function exportarDatos() {
+        // Solo traemos lo que corresponde al tipoArea actual
+        const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoArea);
+        const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoArea);
+        
+        const dataExport = { area: tipoArea, preguntas: p, bodegas: b };
+        const blob = new Blob([JSON.stringify(dataExport, null, 2)], {type:'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `respaldo_${tipoArea}_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+    }
+
+    async function importarJSON() {
+        const file = document.getElementById('jsonFile').files[0];
+        if(!file) return alert("Selecciona un archivo JSON");
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const content = JSON.parse(e.target.result);
+            // Validamos que el archivo coincida con el área
+            if(content.area !== tipoArea) {
+                if(!confirm(`Este respaldo parece ser de ${content.area}. ¿Quieres forzar la carga en ${tipoArea}?`)) return;
+            }
+            // Limpiar IDs para evitar duplicados y asignar tipo actual
+            const clean = (list) => list.map(({id, created_at, ...r}) => ({...r, tipo: tipoArea}));
+            if(content.preguntas) await _supabase.from('configuracion_preguntas').insert(clean(content.preguntas));
+            if(content.bodegas) await _supabase.from('bodegas').insert(clean(content.bodegas));
+            alert("Respaldo restaurado"); location.reload();
+        };
+        reader.readAsText(file);
     }
 
     // --- IMPORTACIÓN CSV ---
     async function importarCSV() {
         const fileInput = document.getElementById('csvFile');
         if (!fileInput.files[0]) return alert("Selecciona un archivo CSV");
-
         const reader = new FileReader();
         reader.onload = async (e) => {
-            const text = e.target.result;
-            const rows = text.split('\n');
+            const rows = e.target.result.split('\n');
             const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
-            
             const preguntas = [];
             for(let i=1; i<rows.length; i++) {
                 const cols = rows[i].split(',');
                 if(cols.length < 4) continue;
-                
                 let rowData = {};
                 headers.forEach((h, idx) => rowData[h] = cols[idx]?.trim());
-                
                 preguntas.push({
-                    titulo: rowData.titulo,
-                    desglose: rowData.desglose,
-                    pregunta: rowData.pregunta,
-                    ponderacion: parseFloat(rowData.ponderacion),
-                    aplica_a_departamento: rowData.aplica_a_departamento || "TODOS",
-                    tipo: tipoArea
+                    titulo: rowData.titulo, desglose: rowData.desglose, pregunta: rowData.pregunta,
+                    ponderacion: parseFloat(rowData.ponderacion), aplica_a_departamento: rowData.aplica_a_departamento || "TODOS",
+                    tipo: tipoArea // Forzamos el área actual
                 });
             }
-
-            if(confirm(`¿Subir ${preguntas.length} preguntas a ${tipoArea}?`)) {
-                const { error } = await _supabase.from('configuracion_preguntas').insert(preguntas);
-                if(!error) { alert("Importación Exitosa"); location.reload(); }
-                else alert("Error: " + error.message);
-            }
+            const { error } = await _supabase.from('configuracion_preguntas').insert(preguntas);
+            if(!error) { alert("Catálogo actualizado"); location.reload(); }
         };
         reader.readAsText(fileInput.files[0]);
     }
 
-    // --- RESTO DE FUNCIONES (Cargar, Guardar, Eliminar) ---
+    // --- FUNCIONES DE APOYO (GUARDAR, CARGAR, ETC) ---
     function actualizarMenuDepartamentos() {
         const select = document.getElementById('p-depto-filtro');
         const val = select.value;
-        select.innerHTML = '<option value="TODOS">TODOS (General)</option>';
+        select.innerHTML = '<option value="TODOS">TODOS</option>';
         departamentosUnicos.forEach(d => { if(d !== "TODOS") select.innerHTML += `<option value="${d}">${d}</option>`; });
         if (departamentosUnicos.includes(val)) select.value = val;
     }
@@ -248,12 +264,6 @@
         resetForm('p'); cargarPreguntas();
     }
 
-    function prepararEdicionPregunta(p) {
-        document.getElementById('p-tit').value = p.titulo; document.getElementById('p-des').value = p.desglose; document.getElementById('p-pre').value = p.pregunta; document.getElementById('p-pts').value = p.ponderacion;
-        setTimeout(() => { document.getElementById('p-depto-filtro').value = p.aplica_a_departamento || 'TODOS'; }, 100);
-        editandoId = p.id; document.getElementById('btn-save-pregunta').innerText = "💾 Guardar Cambios"; document.getElementById('btn-save-pregunta').className = "btn-action btn-orange"; window.scrollTo(0,0);
-    }
-
     async function cargarBodegas() {
         const { data } = await _supabase.from('bodegas').select('*').eq('tipo', tipoArea).order('localizacion');
         departamentosUnicos = [...new Set(data.map(b => b.departamento))].sort();
@@ -263,31 +273,12 @@
 
     async function guardarBodega() {
         const payload = { localizacion: document.getElementById('b-loc').value, departamento: document.getElementById('b-dep').value, nombre: document.getElementById('b-nom').value, tipo: tipoArea };
-        await _supabase.from('bodegas').insert([payload]); resetForm('b'); await cargarBodegas();
-    }
-
-    async function cargarAuditores() {
-        const { data } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
-        document.getElementById('tbody-auditores').innerHTML = data.map(a => `<tr><td>${a.nombre}</td><td>${a.puesto}</td><td><button class="btn-icon del-btn" onclick="eliminarRegistro('auditores','${a.id}')">🗑️</button></td></tr>`).join('');
-    }
-
-    async function guardarAuditor() {
-        await _supabase.from('auditores').insert([{ nombre: document.getElementById('a-nom').value, puesto: document.getElementById('a-pue').value }]);
-        resetForm('a'); cargarAuditores();
-    }
-
-    async function exportarDatos() {
-        const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoArea);
-        const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoArea);
-        const blob = new Blob([JSON.stringify({preguntas:p, bodegas:b}, null, 2)], {type:'application/json'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-        a.download = `backup_${tipoArea}.json`; a.click();
+        await _supabase.from('bodegas').insert([payload]); cargarBodegas();
     }
 
     function resetForm(prefix) {
         editandoId = null;
-        if(prefix==='p') { document.getElementById('p-pre').value=''; document.getElementById('btn-save-pregunta').innerText="Guardar Pregunta"; document.getElementById('btn-save-pregunta').className="btn-action btn-green"; }
-        else if(prefix==='b') { document.getElementById('b-loc').value=''; document.getElementById('b-dep').value=''; document.getElementById('b-nom').value=''; }
+        if(prefix==='p') { document.getElementById('p-pre').value=''; document.getElementById('p-tit').value=''; document.getElementById('p-des').value=''; }
     }
 
     async function eliminarRegistro(tabla, id) {
