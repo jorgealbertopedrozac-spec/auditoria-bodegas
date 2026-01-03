@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Realizar Auditoría - Sistema Pro</title>
+    <title>Realizar Auditoría Dinámica - Sistema Pro</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --danger: #e74c3c; --bg: #f0f2f5; --accent: #3498db; }
@@ -55,11 +55,7 @@
         .desglose-titulo { font-weight: bold; color: #555; margin: 20px 0 10px 10px; border-left: 4px solid var(--success); padding-left: 10px; font-size: 1.1em; }
         .pregunta-card { background: #fff; padding: 18px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #eee; transition: 0.3s; }
         
-        .opciones { display: flex; gap: 12px; margin: 15px 0; }
-        .radio-btn { flex: 1; }
-        .radio-btn input { display: none; }
         .radio-btn label { display: block; text-align: center; padding: 12px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        
         .check-c:checked + label { background: var(--success); color: white; border-color: var(--success); }
         .check-nc:checked + label { background: var(--danger); color: white; border-color: var(--danger); }
 
@@ -73,7 +69,6 @@
         .btn-del-foto { position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
 
         #btn-finalizar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; background: var(--primary); color: white; border: none; padding: 18px; border-radius: 50px; font-size: 1.2em; font-weight: bold; cursor: pointer; box-shadow: 0 5px 20px rgba(0,0,0,0.3); z-index: 1000; }
-        #btn-finalizar:disabled { background: #95a5a6; }
         select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 1em; background: #fff; margin-top: 5px; }
     </style>
 </head>
@@ -81,7 +76,7 @@
 
 <div class="score-bar">
     <a id="btn-regresar" href="index.html" class="btn-inicio-flotante">⬅ Inicio</a>
-    <div style="font-size: 0.85em;">Progreso: <span id="realtime-progress">0</span>/<span id="realtime-total-q">0</span></div>
+    <div style="font-size: 0.85em;">Preguntas: <span id="realtime-progress">0</span>/<span id="realtime-total-q">0</span></div>
     <div style="font-size: 1.2em;"><span id="realtime-score">0.0</span>%</div>
 </div>
 
@@ -91,10 +86,15 @@
     
     <div class="header-info">
         <div><label><strong>👤 Auditor</strong></label><select id="selectAuditor"></select></div>
-        <div style="margin-top:10px;"><label><strong>📦 Ubicación / Unidad</strong></label><select id="selectBodega"></select></div>
+        <div style="margin-top:10px;">
+            <label><strong>📦 Ubicación / Unidad</strong></label>
+            <select id="selectBodega" onchange="filtrarYRenderizar()"></select>
+        </div>
     </div>
 
-    <div id="renderArea"></div>
+    <div id="renderArea">
+        <p style="text-align: center; color: #7f8c8d; padding: 20px;">Seleccione una ubicación para cargar el checklist correspondiente.</p>
+    </div>
 </div>
 
 <button id="btn-finalizar" onclick="enviarEvaluacion()">💾 Guardar Evaluación</button>
@@ -107,25 +107,44 @@
     const urlParams = new URLSearchParams(window.location.search);
     const tipoAuditoria = urlParams.get('tipo') || 'almacen';
 
-    let preguntasGlobal = [];
+    let preguntasMaestras = []; // Todas las preguntas del área
+    let preguntasFiltradas = []; // Solo las que aplican al depto seleccionado
+    let bodegasMaestras = [];
     let archivosAcumulados = {};
 
     async function init() {
         document.getElementById('tipo-area-display').innerText = `Auditoría de ${tipoAuditoria}`;
         document.getElementById('btn-regresar').href = `menu_area.html?tipo=${tipoAuditoria}`;
         
+        // 1. Cargar Auditores
         const { data: a } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
         document.getElementById('selectAuditor').innerHTML = '<option value="">Selecciona Auditor...</option>' + a.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
 
+        // 2. Cargar Bodegas Maestras
         const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoAuditoria).order('localizacion');
+        bodegasMaestras = b;
         document.getElementById('selectBodega').innerHTML = '<option value="">Selecciona Unidad...</option>' + b.map(x => `<option value="${x.id}">${x.localizacion} | ${x.nombre}</option>`).join('');
 
+        // 3. Cargar Preguntas Maestras del área (Almacén o Reparto)
         const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoAuditoria);
-        p.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
+        preguntasMaestras = p.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
+    }
 
-        preguntasGlobal = p;
-        document.getElementById('realtime-total-q').innerText = p.length;
-        renderizarAuditoria(p);
+    function filtrarYRenderizar() {
+        const bodegaId = document.getElementById('selectBodega').value;
+        if (!bodegaId) return;
+
+        const bodegaSeleccionada = bodegasMaestras.find(x => x.id == bodegaId);
+        const depto = bodegaSeleccionada.departamento;
+
+        // Filtrar preguntas que sean "TODOS" o que coincidan exactamente con el depto de la bodega
+        preguntasFiltradas = preguntasMaestras.filter(p => 
+            p.aplica_a_departamento === 'TODOS' || p.aplica_a_departamento === depto
+        );
+
+        document.getElementById('realtime-total-q').innerText = preguntasFiltradas.length;
+        renderizarAuditoria(preguntasFiltradas);
+        actualizarPuntajeRealTime();
     }
 
     function toggleSeccion(index) {
@@ -138,6 +157,11 @@
     function renderizarAuditoria(preguntas) {
         const area = document.getElementById('renderArea');
         let html = '', uTit = '', uDes = '', seccionIndex = -1;
+
+        if(preguntas.length === 0) {
+            area.innerHTML = '<p style="text-align:center; color:var(--danger);">No hay preguntas configuradas para este departamento.</p>';
+            return;
+        }
 
         preguntas.forEach((p, i) => {
             if (p.titulo !== uTit) {
@@ -186,7 +210,7 @@
     function actualizarPuntajeRealTime() {
         let pObtTotal = 0, pPosTotal = 0, contestadas = 0, secStats = {};
 
-        preguntasGlobal.forEach((p, i) => {
+        preguntasFiltradas.forEach((p, i) => {
             const isC = document.getElementById(`c-${i}`).checked;
             const isNC = document.getElementById(`nc-${i}`).checked;
             const card = document.querySelector(`.pregunta-card[data-idx="${i}"]`);
@@ -205,7 +229,12 @@
             }
         });
 
-        document.getElementById('realtime-score').innerText = pPosTotal > 0 ? ((pObtTotal / pPosTotal) * 100).toFixed(1) : "0.0";
+        // El score se calcula sobre el 100% de las preguntas filtradas (visibles)
+        // Para que siempre sume 100 independientemente de cuántas preguntas se quitaron
+        const totalPonderacionVisible = preguntasFiltradas.reduce((acc, curr) => acc + parseFloat(curr.ponderacion), 0);
+        
+        const scoreGral = totalPonderacionVisible > 0 ? ((pObtTotal / totalPonderacionVisible) * 100).toFixed(1) : "0.0";
+        document.getElementById('realtime-score').innerText = scoreGral;
         document.getElementById('realtime-progress').innerText = contestadas;
 
         Object.keys(secStats).forEach(sIdx => {
@@ -256,12 +285,13 @@
         btn.disabled = true;
         let pObt = 0, pTot = 0, respuestas = [];
 
-        for (let i = 0; i < preguntasGlobal.length; i++) {
+        for (let i = 0; i < preguntasFiltradas.length; i++) {
             const isC = document.getElementById(`c-${i}`).checked;
             const isNC = document.getElementById(`nc-${i}`).checked;
             if (isC || isNC) {
-                const pts = isC ? parseFloat(preguntasGlobal[i].ponderacion) : 0;
-                pObt += pts; pTot += parseFloat(preguntasGlobal[i].ponderacion);
+                const pts = isC ? parseFloat(preguntasFiltradas[i].ponderacion) : 0;
+                pObt += pts; 
+                pTot += parseFloat(preguntasFiltradas[i].ponderacion);
                 
                 let urls = [];
                 const fotos = archivosAcumulados[i] || [];
@@ -271,14 +301,14 @@
                     if (data) urls.push(_supabase.storage.from('evidencias').getPublicUrl(path).data.publicUrl);
                 }
                 respuestas.push({
-                    pregunta_id: preguntasGlobal[i].id, cumple: isC, puntos_obtenidos: pts,
+                    pregunta_id: preguntasFiltradas[i].id, cumple: isC, puntos_obtenidos: pts,
                     observaciones: document.getElementById(`obs-${i}`).value, foto_url: urls.join(',')
                 });
             }
         }
 
-        if (respuestas.length < preguntasGlobal.length) {
-            alert("⚠️ Debes contestar todas las preguntas.");
+        if (respuestas.length < preguntasFiltradas.length) {
+            alert("⚠️ Debes contestar todas las preguntas visibles.");
             btn.disabled = false; btn.innerText = "💾 Guardar Evaluación";
             return;
         }
@@ -290,11 +320,10 @@
 
         if (!evErr) {
             await _supabase.from('respuestas').insert(respuestas.map(r => ({ ...r, evaluacion_id: evData[0].id })));
-            alert(`✅ Auditoría de ${tipoAuditoria} guardada con éxito: ${score}%`);
+            alert(`✅ Auditoría de ${tipoAuditoria} guardada: ${score}%`);
             window.location.href = `menu_area.html?tipo=${tipoAuditoria}`;
         } else {
             btn.disabled = false;
-            alert("Error al guardar la evaluación.");
         }
     }
 
