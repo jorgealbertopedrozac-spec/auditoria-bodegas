@@ -53,7 +53,6 @@
         .desglose-titulo { font-weight: bold; color: #555; margin: 20px 0 10px 10px; border-left: 4px solid var(--success); padding-left: 10px; font-size: 1.1em; }
         .pregunta-card { background: #fff; padding: 18px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #eee; transition: 0.3s; }
         
-        /* BOTONES ORIGINALES CONFORME / NO CONFORME */
         .opciones { display: flex; gap: 12px; margin: 15px 0; }
         .radio-btn { flex: 1; }
         .radio-btn input { display: none; }
@@ -132,6 +131,38 @@
 
         const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoAuditoria);
         preguntasMaestras = p.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
+    }
+
+    // --- NUEVA FUNCIÓN DE COMPRESIÓN ---
+    async function comprimirImagen(archivo) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(archivo);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    // Ajustamos el tamaño máximo (ej. 1200px de ancho)
+                    const MAX_WIDTH = 1200;
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * scaleSize;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    // Convertimos a Blob con calidad 0.7 (70%)
+                    ctx.canvas.toBlob((blob) => {
+                        const file = new File([blob], archivo.name, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        resolve(file);
+                    }, 'image/jpeg', 0.7);
+                };
+            };
+        });
     }
 
     function filtrarYRenderizar() {
@@ -249,10 +280,21 @@
         });
     }
 
-    function manejarSeleccion(i) {
+    async function manejarSeleccion(i) {
         const input = document.getElementById(`file-${i}`);
         if (!archivosAcumulados[i]) archivosAcumulados[i] = [];
-        archivosAcumulados[i] = [...archivosAcumulados[i], ...Array.from(input.files)];
+        
+        const btnTexto = document.getElementById(`txt-foto-${i}`);
+        btnTexto.innerText = "⏳ Comprimiendo...";
+
+        const nuevosArchivos = Array.from(input.files);
+        
+        for (const f of nuevosArchivos) {
+            // Comprimimos antes de añadir al array acumulado
+            const comprimido = await comprimirImagen(f);
+            archivosAcumulados[i].push(comprimido);
+        }
+
         input.value = ""; 
         actualizarVistaPrevia(i);
     }
