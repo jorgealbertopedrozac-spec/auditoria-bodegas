@@ -17,7 +17,7 @@
         .filter-group label { display: block; font-size: 0.7rem; font-weight: bold; color: #666; margin-bottom: 4px; }
         select, input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9em; outline: none; }
 
-        /* Dashboard y Gráficos */
+        /* Dashboard */
         .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-bottom: 20px; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .score-big { font-size: 3.5em; font-weight: bold; text-align: center; margin: 10px 0; }
@@ -41,28 +41,24 @@
         .modal-content { background: white; margin: 2% auto; padding: 25px; width: 90%; max-width: 850px; border-radius: 20px; max-height: 85vh; overflow-y: auto; position: relative; }
         .close-modal { position: sticky; top: 0; float: right; border: none; background: #fdeaea; color: var(--danger); padding: 8px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; z-index: 10; }
         
+        /* Evidencias y Resaltado */
         .img-evidencia { width: 120px; height: 120px; object-fit: cover; border-radius: 10px; margin: 8px 8px 0 0; cursor: pointer; border: 2px solid #eee; transition: 0.2s; }
         .img-evidencia:hover { border-color: var(--accent); transform: scale(1.02); }
-        .btn-regresar { text-decoration: none; font-weight: bold; color: var(--primary); display: flex; align-items: center; gap: 5px; }
+        
+        .obs-box { 
+            font-size: 0.85em; padding: 10px; border-radius: 8px; margin-top: 10px; 
+            border-left: 5px solid #ddd; background: #f9f9f9; color: #555; 
+        }
+        /* Estilo para llamar la atención en observaciones con contenido */
+        .obs-highlight { 
+            background: #fff9c4 !important; color: #856404 !important; 
+            border-left-color: #ffc107 !important; border: 1px solid #ffeeba;
+            font-weight: 500;
+        }
 
         /* VISOR DE FOTOS CON ZOOM */
-        #modalFoto { 
-            z-index: 4000; 
-            display: none; 
-            justify-content: center; 
-            align-items: center; 
-            background: rgba(0,0,0,0.95); 
-            overflow: hidden; 
-            touch-action: none; 
-        }
-        #modalFoto img { 
-            max-width: 90%; 
-            max-height: 90vh; 
-            border-radius: 5px; 
-            cursor: grab;
-            transition: transform 0.1s ease-out;
-            transform-origin: center center;
-        }
+        #modalFoto { z-index: 4000; display: none; justify-content: center; align-items: center; background: rgba(0,0,0,0.95); overflow: hidden; touch-action: none; }
+        #modalFoto img { max-width: 90%; max-height: 90vh; border-radius: 5px; cursor: grab; transition: transform 0.1s ease-out; transform-origin: center center; }
         #modalFoto img:active { cursor: grabbing; }
         .close-foto { position: absolute; top: 20px; right: 20px; background: white; border: none; padding: 10px 20px; border-radius: 50px; cursor: pointer; font-weight: bold; z-index: 4001; }
 
@@ -128,7 +124,7 @@
     const urlParams = new URLSearchParams(window.location.search);
     const tipoArea = urlParams.get('tipo') || 'almacen';
 
-    // Variables para el Zoom
+    // Variables de control de Zoom
     let scale = 1, pointX = 0, pointY = 0, isPanning = false, start = { x: 0, y: 0 };
 
     async function init() {
@@ -176,9 +172,8 @@
         }
 
         const avg = data.reduce((acc, v)=> acc + v.calificacion_final, 0) / data.length;
-        const mainScore = document.getElementById('main-score');
-        mainScore.innerText = avg.toFixed(1) + "%";
-        mainScore.style.color = avg >= 90 ? 'var(--success)' : (avg >= 80 ? 'var(--warning)' : 'var(--danger)');
+        document.getElementById('main-score').innerText = avg.toFixed(1) + "%";
+        document.getElementById('main-score').style.color = avg >= 90 ? 'var(--success)' : (avg >= 80 ? 'var(--warning)' : 'var(--danger)');
 
         document.getElementById('lista-evaluaciones').innerHTML = data.map(ev => `
             <tr onclick="verDetalle('${ev.id}', '${ev.bodegas.nombre}')">
@@ -188,7 +183,6 @@
                 <td style="font-weight:bold; color:${ev.calificacion_final>=90?'var(--success)':'var(--danger)'}">${ev.calificacion_final}%</td>
             </tr>`).join('');
 
-        // Cargar Puntos Críticos
         const ids = data.map(x => x.id);
         const { data: resp } = await _supabase.from('respuestas').select('cumple, configuracion_preguntas(pregunta)').in('evaluacion_id', ids);
         const stats = {};
@@ -220,14 +214,20 @@
         let html = '';
         data.forEach(r => {
             const fotos = r.foto_url ? r.foto_url.split(',') : [];
+            
+            // Lógica de resaltado de observaciones
+            const obsText = (r.observaciones || '').trim();
+            const esRelevante = obsText !== '' && obsText.toLowerCase() !== 'sin comentarios' && obsText.toLowerCase() !== 'sin comentarios.';
+            const claseObs = esRelevante ? 'obs-box obs-highlight' : 'obs-box';
+
             html += `<div style="padding:15px 0; border-bottom:1px solid #f0f0f0">
                 <p style="margin:0; font-size:1em; color:var(--primary);"><strong>${r.configuracion_preguntas.pregunta}</strong></p>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
                     <span style="font-size:0.8em; font-weight:bold; color:${r.cumple?'var(--success)':'var(--danger)'}">${r.cumple?'✅ CONFORME':'❌ NO CONFORME'}</span>
                     <span style="font-size:0.8em; color:#888;">Puntos: ${r.puntos_obtenidos}</span>
                 </div>
-                <p style="font-size:0.85em; color:#555; background:#f9f9f9; padding:8px; border-radius:5px; margin-top:10px;">
-                    <b>Observación:</b> ${r.observaciones || 'Sin comentarios.'}
+                <p class="${claseObs}">
+                    <b>Observación:</b> ${obsText || 'Sin comentarios.'}
                 </p>
                 <div style="display:flex; flex-wrap:wrap; margin-top:10px;">
                     ${fotos.map(f => `<img src="${f}" class="img-evidencia" onclick="verFoto('${f}')">`).join('')}
@@ -238,25 +238,24 @@
         document.getElementById('modalDetalle').style.display = 'block';
     }
 
-    // --- LÓGICA DE VISOR DE FOTOS (MOUSE & TOUCH) ---
+    // --- LÓGICA DEL VISOR CON ZOOM Y GESTOS ---
     function verFoto(url) {
         const modal = document.getElementById('modalFoto');
         const img = document.getElementById('fotoGrande');
-        scale = 1; pointX = 0; pointY = 0; // Reset
+        scale = 1; pointX = 0; pointY = 0;
         img.src = url;
         img.style.transform = `translate(0px, 0px) scale(1)`;
         modal.style.display = 'flex';
 
-        // Mouse Wheel Zoom
+        // Zoom con Rueda
         img.onwheel = function(e) {
             e.preventDefault();
-            const delta = -e.deltaY;
-            const factor = delta > 0 ? 1.2 : 0.8;
+            const factor = e.deltaY > 0 ? 0.8 : 1.2;
             scale = Math.min(Math.max(1, scale * factor), 5);
             img.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`;
         };
 
-        // Mouse Drag (PC)
+        // Arrastrar con Mouse
         img.onmousedown = function(e) {
             e.preventDefault();
             start = { x: e.clientX - pointX, y: e.clientY - pointY };
@@ -270,7 +269,7 @@
         };
         window.onmouseup = function() { isPanning = false; };
 
-        // Touch Gestures (Mobile)
+        // Gestos Táctiles (Pinch & Pan)
         let initialDist = 0;
         img.ontouchstart = function(e) {
             if (e.touches.length === 2) {
@@ -280,13 +279,14 @@
             }
         };
         img.ontouchmove = function(e) {
-            e.preventDefault();
             if (e.touches.length === 2) {
-                let currentDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-                let zoom = currentDist / initialDist;
+                e.preventDefault();
+                let d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                let zoom = d / initialDist;
                 scale = Math.min(Math.max(1, scale * zoom), 5);
-                initialDist = currentDist;
-            } else {
+                initialDist = d;
+            } else if (scale > 1) {
+                e.preventDefault();
                 pointX = e.touches[0].clientX - start.x;
                 pointY = e.touches[0].clientY - start.y;
             }
