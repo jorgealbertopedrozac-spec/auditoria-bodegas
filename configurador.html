@@ -78,6 +78,41 @@
         .del-btn { background: var(--danger); }
         .tag-depto { font-size: 0.7em; background: #e2e8f0; color: #4a5568; padding: 2px 6px; border-radius: 4px; font-weight: bold; display: inline-block; margin-top: 4px; }
 
+        /* ESTILOS DE LA PANTALLA DE BLOQUEO */
+        #lock-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--primary); /* Usa el azul oscuro de tu tema */
+            z-index: 9999; /* Asegura que esté por encima de todo */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .lock-box {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .lock-input {
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            text-align: center;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            width: 200px;
+        }
+
         @media (max-width: 600px) {
             .container { padding: 10px; }
             h2 { font-size: 1.2em; }
@@ -86,6 +121,23 @@
     </style>
 </head>
 <body>
+
+<div id="lock-screen">
+    <div class="lock-box">
+        <h1 style="margin: 0 0 15px 0; font-size: 3em;">🔒</h1>
+        <h3 style="margin: 0 0 20px 0;">Acceso Restringido</h3>
+        
+        <input type="password" id="admin-pass" class="lock-input" placeholder="Contraseña..." onkeyup="verificarEnter(event)">
+        <br>
+        <button onclick="desbloquear()" class="btn-action btn-green" style="width: 200px;">Desbloquear</button>
+        
+        <p id="lock-msg" style="color: #ff7675; margin-top: 10px; display: none; font-weight: bold;">Contraseña Incorrecta</p>
+        
+        <div style="margin-top: 20px;">
+            <a href="index.html" style="color: #bdc3c7; text-decoration: none; font-size: 0.9em;">⬅ Volver al Menú</a>
+        </div>
+    </div>
+</div>
 
 <div style="max-width: 1100px; margin: auto; padding: 5px 0;">
     <a id="btn-volver-menu" href="index.html" style="background: #ecf0f1; color: #2c3e50; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.75em; border: 1px solid #ddd;">⬅ Volver</a>
@@ -167,6 +219,36 @@
 </div>
 
 <script>
+    // --- LÓGICA DE BLOQUEO DE PANTALLA ---
+    const PASSWORD_SECRET = "admin123"; // <--- CAMBIA TU CONTRASEÑA AQUÍ
+
+    function desbloquear() {
+        const input = document.getElementById('admin-pass');
+        const msg = document.getElementById('lock-msg');
+        const lockScreen = document.getElementById('lock-screen');
+
+        if (input.value === PASSWORD_SECRET) {
+            lockScreen.style.transition = "opacity 0.5s ease";
+            lockScreen.style.opacity = "0";
+            setTimeout(() => {
+                lockScreen.style.display = "none";
+            }, 500);
+        } else {
+            msg.style.display = "block";
+            input.value = "";
+            input.focus();
+            input.style.border = "2px solid #e74c3c";
+            setTimeout(() => input.style.border = "none", 500);
+        }
+    }
+
+    function verificarEnter(event) {
+        if (event.key === "Enter") {
+            desbloquear();
+        }
+    }
+    // --------------------------------------
+
     const SUPABASE_URL = 'https://xjckzbegtvianurfvubp.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqY2t6YmVndHZpYW51cmZ2dWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxOTYzMzUsImV4cCI6MjA4Mjc3MjMzNX0.64zrKi0p1KiDwtBODLRf8O4sRvnn0o9QyoQUYHvVFd0';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
