@@ -112,6 +112,11 @@
     
     <div class="header-info">
         <div id="auditorRow"><label><strong>👤 Auditor</strong></label><select id="selectAuditor"></select></div>
+        <div id="auditorManualRow" style="display:none; margin-top:10px;">
+            <label><strong>✍️ Nombre del Auditor</strong></label>
+            <input id="inputAuditorManual" type="text" placeholder="Ej: Juan Pérez">
+            <div style="font-size:0.8em; color:#6b7280; margin-top:6px;">(Montacargas) No necesita estar registrado. Se guardará en la evaluación.</div>
+        </div>
         <div style="margin-top:10px;">
             <label><strong>📦 Ubicación / Unidad</strong></label>
             <select id="selectBodega" onchange="filtrarYRenderizar()"></select>
@@ -187,10 +192,19 @@
         document.getElementById('tipo-area-display').innerText = `Auditoría de ${tipoAuditoria}`;
         document.getElementById('btn-regresar').href = `menu_area.html?tipo=${tipoAuditoria}`;
         
+        // Montacargas: auditor manual (texto) + selección automática de unidad por QR
+        toggleAuditorModoMontacargas();
+
+        
         const { data: a } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
         document.getElementById('selectAuditor').innerHTML = '<option value="">Selecciona Auditor...</option>' + a.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
 
-        const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoAuditoria).order('localizacion');
+        let { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoAuditoria).order('localizacion');
+        // Si no hay unidades por tipo (por datos inconsistentes), traer todo como fallback
+        if (!b || b.length === 0) {
+            const fb = await _supabase.from('bodegas').select('*').order('localizacion');
+            b = fb.data || [];
+        }
         bodegasData = b;
         document.getElementById('selectBodega').innerHTML = '<option value="">Selecciona Unidad...</option>' + b.map(x => `<option value="${x.id}">${x.localizacion} | ${x.nombre}</option>`).join('');
 
@@ -293,8 +307,28 @@
     }
 
     
-    function autoStartMontacargas() {
+    
+    function toggleAuditorModoMontacargas() {
+        const isM = (tipoAuditoria === 'montacargas');
+        const rowSel = document.getElementById('auditorRow');
+        const rowMan = document.getElementById('auditorManualRow');
+        if (rowSel) rowSel.style.display = isM ? 'none' : 'block';
+        if (rowMan) rowMan.style.display = isM ? 'block' : 'none';
+    }
+
+function retryAutoStartMontacargas() {
+        // Si bodegas aún no cargan, reintentar una vez
+        if (!bodegasData || bodegasData.length === 0) {
+            setTimeout(()=>autoStartMontacargas(true), 400);
+            return true;
+        }
+        return false;
+    }
+
+    function autoStartMontacargas(retry=false) {
         if (tipoAuditoria !== 'montacargas') return;
+        if (!retry && retryAutoStartMontacargas()) return;
+
 
         // Mostrar caja de escaneo
         const box = document.getElementById('scannerBox');
@@ -400,6 +434,8 @@
 
     async function procesarQR(textoQR) {
         if (tipoAuditoria !== 'montacargas') return;
+        if (!retry && retryAutoStartMontacargas()) return;
+
         let unidadId = _tryExtractUnidadId(textoQR);
 
         if (!unidadId) {
@@ -407,7 +443,6 @@
             const key = decodeURIComponent((textoQR || '').trim()).toLowerCase();
             try {
                 const { data: fb } = await _supabase.from('bodegas').select('*')
-                    .eq('tipo', tipoAuditoria)
                     .or(`localizacion.ilike.%${key}%,nombre.ilike.%${key}%`)
                     .limit(1);
                 if (fb && fb.length > 0) {
@@ -434,7 +469,7 @@
             // Fallback: buscar en Supabase por id (por si bodegasData viene vacío o incompleto)
             try {
                 const { data: fb } = await _supabase.from('bodegas').select('*')
-                    .eq('tipo', tipoAuditoria).eq('id', unidadId).limit(1);
+                    .eq('id', unidadId).limit(1);
                 if (fb && fb.length > 0) {
                     bodegasData = (bodegasData || []).concat(fb.filter(x => !(bodegasData || []).some(b => b.id === x.id)));
                     // Re-render select options si venía vacío
@@ -457,9 +492,19 @@
         scannedBodegaId = unidadId;
         document.getElementById('selectBodega').value = unidadId;
 
+        // ensure option exists (por si no estaba en el select)
+        const sel = document.getElementById('selectBodega');
+        if (sel && !Array.from(sel.options).some(o => o.value == unidadId)) {
+            const found = (bodegasData || []).find(b => b.id == unidadId);
+            const label = found ? `${found.localizacion} | ${found.nombre}` : unidadId;
+            sel.innerHTML += `<option value="${unidadId}">${label}</option>`;
+            sel.value = unidadId;
+        }
+
+
 
         // Para montacargas: si ya escaneó, ocultamos el selector para evitar cambio accidental
-        document.getElementById('selectBodega').disabled = true;
+        // document.getElementById('selectBodega').disabled = true;
 
         setScanStatus("✅ Unidad seleccionada por QR. Ingresa operador para continuar.");
         cerrarScanner();
@@ -472,6 +517,8 @@
     
     function pedirOperador() {
         if (tipoAuditoria !== 'montacargas') return;
+        if (!retry && retryAutoStartMontacargas()) return;
+
 
         // Flujo simple: pedir por prompt (más confiable en celular)
         const nombre = (window.prompt("Nombre del operador del montacargas:", operadorMontacargas || "") || "").trim();
@@ -502,6 +549,8 @@
 
     function abrirScanner() {
         if (tipoAuditoria !== 'montacargas') return;
+        if (!retry && retryAutoStartMontacargas()) return;
+
         const modal = document.getElementById('modalScanner');
         if (modal) modal.style.display = 'block';
 
@@ -541,6 +590,8 @@
 
     function abrirCapturaManual() {
         if (tipoAuditoria !== 'montacargas') return;
+        if (!retry && retryAutoStartMontacargas()) return;
+
         const modal = document.getElementById('modalManual');
         const input = document.getElementById('manualQr');
         if (input) input.value = "";
@@ -556,6 +607,8 @@
 
     function resetMontacargas() {
         if (tipoAuditoria !== 'montacargas') return;
+        if (!retry && retryAutoStartMontacargas()) return;
+
         operadorMontacargas = "";
         scannedBodegaId = "";
         const sel = document.getElementById('selectBodega');
@@ -732,11 +785,18 @@ function filtrarYRenderizar() {
 
     async function enviarEvaluacion() {
         const audId = document.getElementById('selectAuditor').value;
+        const auditorManual = (document.getElementById('inputAuditorManual')?.value || '').trim();
+
         const bodId = document.getElementById('selectBodega').value;
         const btn = document.getElementById('btn-finalizar');
         
         
-        if (!audId || !bodId) return alert("⚠️ Selecciona Auditor y Ubicación.");
+        if (tipoAuditoria === 'montacargas') {
+            if (!bodId) return alert("⚠️ Falta la unidad (escanea el QR).");
+            if (!auditorManual) return alert("⚠️ Escribe el nombre del auditor.");
+        } else {
+            if (!audId || !bodId) return alert("⚠️ Selecciona Auditor y Ubicación.");
+        }
 if (preguntasFiltradas.length === 0) return alert("No hay preguntas para evaluar.");
 
         btn.innerText = "⏳ Guardando...";
@@ -778,6 +838,9 @@ if (preguntasFiltradas.length === 0) return alert("No hay preguntas para evaluar
             // Montacargas: guardar operador (si aplica)
 
             bodega_id: bodId, auditor_id: audId, calificacion_final: score, tipo: tipoAuditoria
+            , auditor_manual: (tipoAuditoria==='montacargas'? auditorManual : null)
+            , auditor_nombre: (tipoAuditoria==='montacargas'? auditorManual : null)
+
             , operador_nombre: (tipoAuditoria==='montacargas'? operadorMontacargas : null)
             , operador: (tipoAuditoria==='montacargas'? operadorMontacargas : null)
 
