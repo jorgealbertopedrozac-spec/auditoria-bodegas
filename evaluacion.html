@@ -210,6 +210,9 @@
 
         const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoAuditoria);
         preguntasMaestras = p.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
+
+        // Montacargas: auto-selección por QR si viene en el link
+        await autoStartMontacargas();
     }
 
     // --- NUEVA FUNCIÓN DE COMPRESIÓN ---
