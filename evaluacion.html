@@ -127,18 +127,13 @@
         const { data: a } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
         document.getElementById('selectAuditor').innerHTML = '<option value="">Selecciona Auditor...</option>' + a.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
 
-        let { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoAuditoria).order('localizacion');
-        // Fallback por si tipo no coincide en datos
-        if (!b || b.length === 0) {
-            const fb = await _supabase.from('bodegas').select('*').order('localizacion');
-            b = fb.data || [];
-        }
+        const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoAuditoria).order('localizacion');
         bodegasData = b;
         document.getElementById('selectBodega').innerHTML = '<option value="">Selecciona Unidad...</option>' + b.map(x => `<option value="${x.id}">${x.localizacion} | ${x.nombre}</option>`).join('');
 
         const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoAuditoria);
         preguntasMaestras = p.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
-        // Montacargas: iniciar flujo por QR si aplica
+        // Montacargas: si viene QR/unidad en el link, auto-seleccionar y pedir auditor/operador (texto)
         await montacargasBoot();
     }
 
@@ -237,34 +232,38 @@
     }
 
     
-    // --- Montacargas: seleccionar unidad desde URL + capturar auditor/operador (no registrados) ---
-    function _norm(s){ return (s ?? '').toString().trim().toLowerCase(); }
+    // --- Montacargas: URL -> unidad automática + auditor/operador MANUALES (sin registrar en auditores) ---
+    // Guardamos auditor/operador como TEXTO en respuestas.observaciones para evitar cambios de RLS/esquema.
+    let __mc_auditor_manual = "";
+    let __mc_operador = "";
 
-    function _pickKeyFromQR(raw){
+    function _mc_norm(s){ return (s ?? '').toString().trim().toLowerCase(); }
+
+    function _mc_pickKey(raw){
         const t = decodeURIComponent((raw || '').trim());
         if (!t) return '';
-        // si viene "aguascalientes | m1" tomar el último
+        // si viene "aguascalientes | m1" tomar el último token
         const parts = t.split('|').map(x=>x.trim()).filter(Boolean);
         const last = parts.length ? parts[parts.length-1] : t;
-        return _norm(last);
+        return _mc_norm(last);
     }
 
-    function _matchBodegaByKey(key){
+    function _mc_matchLocal(key){
         if (!key) return null;
         const tight = key.replace(/\s+/g,'');
         return (bodegasData || []).find(b => {
-            const loc = _norm(b.localizacion);
-            const nom = _norm(b.nombre);
-            const combo = _norm(`${b.localizacion} | ${b.nombre}`);
+            const loc = _mc_norm(b.localizacion);
+            const nom = _mc_norm(b.nombre);
+            const combo = _mc_norm(`${b.localizacion} | ${b.nombre}`);
             const locT = loc.replace(/\s+/g,'');
             const nomT = nom.replace(/\s+/g,'');
             return loc === key || nom === key || combo === key
                 || locT === tight || nomT === tight
-                || loc.startsWith(key) || nom.startsWith(key) || combo.includes(key);
+                || nom.startsWith(key) || loc.startsWith(key) || combo.includes(key);
         }) || null;
     }
 
-    async function _ensureBodegaSelectedFromURL(){
+    async function _mc_selectUnidadFromURL(){
         if (tipoAuditoria !== 'montacargas') return false;
 
         const unidadId = urlParams.get('unidad') || urlParams.get('bodega') || urlParams.get('unidad_id');
@@ -279,17 +278,14 @@
                 if (data && data[0]) selected = data[0];
             }
         } else if (qrRaw) {
-            const key = _pickKeyFromQR(qrRaw);
-            selected = _matchBodegaByKey(key);
+            const key = _mc_pickKey(qrRaw);
+            selected = _mc_matchLocal(key);
             if (!selected && key) {
-                // buscar en supabase por nombre/localizacion sin depender de tipo
                 const { data } = await _supabase.from('bodegas').select('*')
                     .or(`nombre.ilike.%${key}%,localizacion.ilike.%${key}%`)
                     .limit(10);
                 if (data && data.length) {
-                    // elegir el match más exacto si existe
-                    selected = data.find(b => _norm(b.nombre) === key || _norm(b.localizacion) === key) || data[0];
-                    // refrescar cache local
+                    selected = data.find(b => _mc_norm(b.nombre) === key || _mc_norm(b.localizacion) === key) || data[0];
                     bodegasData = (bodegasData || []).concat(data.filter(x => !(bodegasData || []).some(b => b.id === x.id)));
                 }
             }
@@ -306,58 +302,30 @@
         return false;
     }
 
-    async function _getOrCreateAuditorId(nombre){
-        const n = (nombre || '').trim();
-        if (!n) return '';
-        // buscar existente (match exacto case-insensitive)
-        const { data: found } = await _supabase.from('auditores').select('id,nombre').ilike('nombre', n).limit(1);
-        if (found && found[0]) return found[0].id;
-
-        // crear nuevo auditor
-        const { data: created, error } = await _supabase.from('auditores').insert([{
-            nombre: n,
-            activo: true,
-            // campos extra si existen, no rompen si no existen
-            tipo: 'montacargas'
-        }]).select('id').limit(1);
-
-        if (error || !created || !created[0]) return '';
-        return created[0].id;
-    }
-
-    async function montacargasBoot(){
+    async function montacargasBoot() {
         if (tipoAuditoria !== 'montacargas') return;
 
-        // 1) seleccionar unidad desde URL
-        const okUnidad = await _ensureBodegaSelectedFromURL();
-        if (!okUnidad) {
-            // si no hay qr/unidad, dejar flujo normal
-            return;
-        }
+        // Asegurar que el usuario elija auditor_id (registrado) manualmente, como tu flujo normal.
+        // Pero además pedimos un "auditor manual" (texto) para guardar evidencia.
+        const okUnidad = await _mc_selectUnidadFromURL();
+        if (!okUnidad) return; // si no viene QR/unidad, no hacemos nada especial
 
-        // 2) pedir auditor manual y mapearlo a un auditor_id (creándolo si hace falta)
-        const nombreAud = (window.prompt("Nombre del auditor (montacargas):", "") || "").trim();
-        if (!nombreAud) { alert("⚠️ Necesito el nombre del auditor."); return; }
+        // Pedir auditor manual (texto)
+        const audTxt = (window.prompt("Nombre del auditor (texto):", __mc_auditor_manual || "") || "").trim();
+        if (!audTxt) { alert("⚠️ Necesito el nombre del auditor (texto)."); return; }
+        __mc_auditor_manual = audTxt;
 
-        const audId = await _getOrCreateAuditorId(nombreAud);
-        if (!audId) { alert("⚠️ No pude registrar al auditor. Revisa permisos/RLS."); return; }
+        // Pedir operador (texto)
+        const opTxt = (window.prompt("Nombre del operador del montacargas:", __mc_operador || "") || "").trim();
+        if (!opTxt) { alert("⚠️ Necesito el nombre del operador."); return; }
+        __mc_operador = opTxt;
 
-        const selAud = document.getElementById('selectAuditor');
-        if (selAud && !Array.from(selAud.options).some(o => o.value == audId)) {
-            selAud.innerHTML += `<option value="${audId}">${nombreAud}</option>`;
-        }
-        if (selAud) selAud.value = audId;
-
-        // 3) pedir operador
-        const nombreOp = (window.prompt("Nombre del operador del montacargas:", "") || "").trim();
-        if (!nombreOp) { alert("⚠️ Necesito el nombre del operador."); return; }
-
-        // Guardar operador en variable global para incluir en respuestas
-        window.__operadorMontacargas = nombreOp;
-
-        // 4) renderizar preguntas
+        // Ya con unidad seleccionada, el usuario puede elegir el auditor registrado (selectAuditor)
+        // y comenzar la evaluación normalmente.
+        // Si quieres auto-abrir preguntas:
         filtrarYRenderizar();
     }
+    // --- END Montacargas ---
 
 function filtrarYRenderizar() {
         const bodegaId = document.getElementById('selectBodega').value;
@@ -521,6 +489,10 @@ function filtrarYRenderizar() {
         const btn = document.getElementById('btn-finalizar');
         
         if (!audId || !bodId) return alert("⚠️ Selecciona Auditor y Ubicación.");
+        if (tipoAuditoria === 'montacargas') {
+            if (!__mc_auditor_manual) return alert("⚠️ Falta el auditor (texto). Abre de nuevo el QR.");
+            if (!__mc_operador) return alert("⚠️ Falta el operador. Abre de nuevo el QR.");
+        }
         if (preguntasFiltradas.length === 0) return alert("No hay preguntas para evaluar.");
 
         btn.innerText = "⏳ Guardando...";
@@ -553,7 +525,7 @@ function filtrarYRenderizar() {
             }
             respuestas.push({
                 pregunta_id: preguntasFiltradas[i].id, cumple: isC, puntos_obtenidos: pts,
-                observaciones: (tipoAuditoria==='montacargas' && window.__operadorMontacargas ? `[Operador: ${window.__operadorMontacargas}] ` : '') + (document.getElementById(`obs-${i}`).value || ''), foto_url: urls.join(',')
+                observaciones: (tipoAuditoria==='montacargas' ? `[Auditor: ${__mc_auditor_manual || 'N/A'}] [Operador: ${__mc_operador || 'N/A'}] ` : '') + (document.getElementById(`obs-${i}`).value || ''), foto_url: urls.join(',')
             });
         }
 
