@@ -295,20 +295,59 @@
         }).join('');
     }
 
+    
+    async function fetchSignedEvidencias(evaluacionId) {
+        try {
+            const resp = await fetch(`${SUPABASE_URL}/functions/v1/signed-evidencias`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`
+                },
+                body: JSON.stringify({ evaluacion_id: evaluacionId, expires_in: 1800 })
+            });
+            if (!resp.ok) {
+                console.error("signed-evidencias status", resp.status);
+                return {};
+            }
+            const j = await resp.json();
+            const map = {};
+            (j.signed || []).forEach(x => { if (x.path && x.signedUrl) map[x.path] = x.signedUrl; });
+            return map;
+        } catch (e) {
+            console.error("fetchSignedEvidencias", e);
+            return {};
+        }
+    }
+
+
     async function verDetalle(id, nombre) {
-        const { data } = await _supabase.from('respuestas').select('*, configuracion_preguntas(pregunta)').eq('evaluacion_id', id);
+        const { data } = await _supabase
+            .from('respuestas')
+            .select('*, configuracion_preguntas(pregunta)')
+            .eq('evaluacion_id', id);
+
         document.getElementById('modal-titulo').innerText = `Detalle: ${nombre}`;
+
+        const signedMap = await fetchSignedEvidencias(id);
+
         let html = '';
-        data.forEach(r => {
-            const fotos = r.foto_url ? r.foto_url.split(',') : [];
-            
-            // Lógica de resaltado de observaciones
+        (data || []).forEach(r => {
+            const items = r.foto_url ? r.foto_url.split(',').map(x => x.trim()).filter(Boolean) : [];
+
             const obsText = (r.observaciones || '').trim();
             const esRelevante = obsText !== '' && obsText.toLowerCase() !== 'sin comentarios' && obsText.toLowerCase() !== 'sin comentarios.';
             const claseObs = esRelevante ? 'obs-box obs-highlight' : 'obs-box';
 
+            const imgs = items.map(p => {
+                const url = /^https?:\/\//i.test(p) ? p : (signedMap[p] || null);
+                if (!url) return '';
+                return `<img src="${url}" class="img-evidencia" onclick="verFoto('${url}')">`;
+            }).join('');
+
             html += `<div style="padding:15px 0; border-bottom:1px solid #f0f0f0">
-                <p style="margin:0; font-size:1em; color:var(--primary);"><strong>${r.configuracion_preguntas.pregunta}</strong></p>
+                <p style="margin:0; font-size:1em; color:var(--primary);"><strong>${r.configuracion_preguntas?.pregunta || ''}</strong></p>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
                     <span style="font-size:0.8em; font-weight:bold; color:${r.cumple?'var(--success)':'var(--danger)'}">${r.cumple?'✅ CONFORME':'❌ NO CONFORME'}</span>
                     <span style="font-size:0.8em; color:#888;">Puntos: ${r.puntos_obtenidos}</span>
@@ -317,11 +356,12 @@
                     <b>Observación:</b> ${obsText || 'Sin comentarios.'}
                 </p>
                 <div style="display:flex; flex-wrap:wrap; margin-top:10px;">
-                    ${fotos.map(f => `<img src="${f}" class="img-evidencia" onclick="verFoto('${f}')">`).join('')}
+                    ${imgs || ''}
                 </div>
             </div>`;
         });
-        document.getElementById('modal-body').innerHTML = html;
+
+        document.getElementById('modal-body').innerHTML = html || '<p style="color:#999;">Sin detalle.</p>';
         document.getElementById('modalDetalle').style.display = 'block';
     }
 

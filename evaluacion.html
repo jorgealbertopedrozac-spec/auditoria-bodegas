@@ -385,61 +385,108 @@
         actualizarVistaPrevia(preIdx);
     }
 
+    
     async function enviarEvaluacion() {
         const audId = document.getElementById('selectAuditor').value;
         const bodId = document.getElementById('selectBodega').value;
         const btn = document.getElementById('btn-finalizar');
-        
+
         if (!audId || !bodId) return alert("⚠️ Selecciona Auditor y Ubicación.");
         if (preguntasFiltradas.length === 0) return alert("No hay preguntas para evaluar.");
 
         btn.innerText = "⏳ Guardando...";
         btn.disabled = true;
-        let pObt = 0, pTot = 0, respuestas = [];
 
+        // Validación + score
+        let pObt = 0, pTot = 0;
         for (let i = 0; i < preguntasFiltradas.length; i++) {
             const isC = document.getElementById(`c-${i}`).checked;
             const isNC = document.getElementById(`nc-${i}`).checked;
-            
+
             if (!isC && !isNC) {
                 alert("Responde todas las preguntas antes de guardar.");
                 btn.disabled = false; btn.innerText = "💾 Guardar Evaluación";
                 return;
             }
 
-            const pts = isC ? parseFloat(preguntasFiltradas[i].ponderacion) : 0;
-            pObt += pts; 
-            pTot += parseFloat(preguntasFiltradas[i].ponderacion);
-            
-            let urls = [];
-            const fotos = archivosAcumulados[i] || [];
-            for (let f = 0; f < fotos.length; f++) {
-                const path = `ev_${Date.now()}_p${i}_f${f}.jpg`;
-                const { data } = await _supabase.storage.from('evidencias').upload(path, fotos[f]);
-                if (data) {
-                    const { data: pub } = _supabase.storage.from('evidencias').getPublicUrl(path);
-                    urls.push(pub.publicUrl);
-                }
-            }
-            respuestas.push({
-                pregunta_id: preguntasFiltradas[i].id, cumple: isC, puntos_obtenidos: pts,
-                observaciones: document.getElementById(`obs-${i}`).value, foto_url: urls.join(',')
-            });
+            const ptsPos = parseFloat(preguntasFiltradas[i].ponderacion) || 0;
+            const pts = isC ? ptsPos : 0;
+            pObt += pts;
+            pTot += ptsPos;
         }
 
-        const score = ((pObt / pTot) * 100).toFixed(2);
-        const { data: evData, error: evErr } = await _supabase.from('evaluaciones').insert([{
-            bodega_id: bodId, auditor_id: audId, calificacion_final: score, tipo: tipoAuditoria
-        }]).select();
+        const score = pTot > 0 ? ((pObt / pTot) * 100).toFixed(2) : "0.00";
 
-        if (!evErr) {
-            await _supabase.from('respuestas').insert(respuestas.map(r => ({ ...r, evaluacion_id: evData[0].id })));
-            alert(`✅ Auditoría guardada con éxito: ${score}%`);
-            window.location.href = `menu_area.html?tipo=${tipoAuditoria}`;
-        } else {
+        // 1) Crear evaluación para obtener ID
+        const { data: evData, error: evErr } = await _supabase
+            .from('evaluaciones')
+            .insert([{
+                bodega_id: bodId,
+                auditor_id: audId,
+                calificacion_final: score,
+                tipo: tipoAuditoria
+            }])
+            .select();
+
+        if (evErr || !evData || !evData[0]?.id) {
+            console.error(evErr);
             btn.disabled = false;
             btn.innerText = "💾 Guardar Evaluación";
-            alert("Error al guardar la evaluación.");
+            alert("❌ Error al crear la evaluación.");
+            return;
+        }
+
+        const evaluacionId = evData[0].id;
+
+        // 2) Subir fotos a bucket PRIVADO y guardar PATHS (no publicUrl)
+        const respuestas = [];
+        try {
+            for (let i = 0; i < preguntasFiltradas.length; i++) {
+                const isC = document.getElementById(`c-${i}`).checked;
+                const ptsPos = parseFloat(preguntasFiltradas[i].ponderacion) || 0;
+                const pts = isC ? ptsPos : 0;
+
+                const fotos = archivosAcumulados[i] || [];
+                const paths = [];
+
+                for (let f = 0; f < fotos.length; f++) {
+                    const safeName = `p${i}_f${f}_${Date.now()}.jpg`;
+                    const path = `${tipoAuditoria}/${evaluacionId}/${safeName}`;
+
+                    const { error: upErr } = await _supabase.storage
+                        .from('evidencias')
+                        .upload(path, fotos[f], { upsert: true, contentType: 'image/jpeg' });
+
+                    if (upErr) {
+                        console.error("Upload error", upErr);
+                        throw new Error("No se pudo subir una evidencia.");
+                    }
+                    paths.push(path);
+                }
+
+                respuestas.push({
+                    evaluacion_id: evaluacionId,
+                    pregunta_id: preguntasFiltradas[i].id,
+                    cumple: isC,
+                    puntos_obtenidos: pts,
+                    observaciones: document.getElementById(`obs-${i}`).value,
+                    foto_url: paths.join(',')
+                });
+            }
+
+            const { error: rErr } = await _supabase.from('respuestas').insert(respuestas);
+            if (rErr) {
+                console.error(rErr);
+                throw new Error("No se pudieron guardar las respuestas.");
+            }
+
+            alert(`✅ Auditoría guardada con éxito: ${score}%`);
+            window.location.href = `menu_area.html?tipo=${tipoAuditoria}`;
+        } catch (e) {
+            console.error(e);
+            btn.disabled = false;
+            btn.innerText = "💾 Guardar Evaluación";
+            alert("❌ Error guardando evidencias/respuestas. Revisa tu conexión o permisos de Storage.");
         }
     }
 
