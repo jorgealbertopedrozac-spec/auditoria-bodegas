@@ -325,7 +325,7 @@ function retryAutoStartMontacargas() {
         return false;
     }
 
-    function autoStartMontacargas(retry=false) {
+    async function autoStartMontacargas(retry=false) {
         if (tipoAuditoria !== 'montacargas') return;
         if (!retry && retryAutoStartMontacargas()) return;
 
@@ -338,14 +338,14 @@ function retryAutoStartMontacargas() {
         // Si viene unidad por URL, seleccionarla automáticamente
         const unidadParam = urlParams.get('unidad') || urlParams.get('bodega') || urlParams.get('unidad_id');
         if (unidadParam) {
-            procesarQR(unidadParam);
+            await procesarQR(unidadParam);
             return;
         }
 
         // Si viene un QR completo (URL o texto)
         const qrParam = urlParams.get('qr');
         if (qrParam) {
-            procesarQR(qrParam);
+            await procesarQR(qrParam);
         }
     }
 
@@ -440,10 +440,13 @@ function retryAutoStartMontacargas() {
 
         if (!unidadId) {
             // Fallback remoto: buscar por localizacion/nombre (ej: m1)
-            const key = decodeURIComponent((textoQR || '').trim()).toLowerCase();
+            const raw = decodeURIComponent((textoQR || '').trim());
+            // Si viene algo como "aguascalientes | m1", tomar también el último token
+            const tokens = raw.split('|').map(x=>x.trim()).filter(Boolean);
+            const key = (tokens.length ? tokens[tokens.length-1] : raw).toLowerCase();
             try {
                 const { data: fb } = await _supabase.from('bodegas').select('*')
-                    .or(`localizacion.ilike.%${key}%,nombre.ilike.%${key}%`)
+                    .or(`localizacion.eq.${key},nombre.eq.${key},localizacion.ilike.%${key}%,nombre.ilike.%${key}%`)
                     .limit(1);
                 if (fb && fb.length > 0) {
                     unidadId = fb[0].id;
