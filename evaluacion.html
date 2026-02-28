@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Realizar Auditoría Pro - Dinámica</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --danger: #e74c3c; --bg: #f0f2f5; --accent: #3498db; }
         body { 
@@ -79,23 +78,6 @@
 #btn-finalizar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; background: var(--primary); color: white; border: none; padding: 18px; border-radius: 50px; font-size: 1.2em; font-weight: bold; cursor: pointer; box-shadow: 0 5px 20px rgba(0,0,0,0.3); z-index: 1000; }
         #btn-finalizar:disabled { background: #95a5a6; }
         select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 1em; background: #fff; margin-top: 5px; }
-    
-        /* --- Montacargas: Scanner + Operador --- */
-        .scanner-box { background:#fff7ef; border:1px solid #ffd7b8; padding:12px; border-radius:10px; margin-top:10px; }
-        .scanner-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
-        .btn-scan { flex:1; background:#e67e22; color:#fff; border:none; padding:10px; border-radius:8px; cursor:pointer; font-weight:bold; }
-        .btn-scan.secondary { background:#95a5a6; }
-        .scan-status { font-size:0.85em; color:#6b7280; margin-top:8px; }
-        .modal-lite { display:none; position:fixed; z-index:5000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.55); }
-        .modal-lite .box { background:#fff; width:92%; max-width:520px; margin:12% auto; padding:18px; border-radius:16px; }
-        .modal-lite h3 { margin:0 0 10px 0; color:var(--primary); }
-        .modal-lite .row { display:flex; gap:10px; flex-wrap:wrap; }
-        .modal-lite input { width:100%; padding:12px; border:1px solid #ddd; border-radius:10px; font-size:1em; box-sizing:border-box; }
-        .modal-lite .btn { width:100%; padding:12px; border:none; border-radius:10px; font-weight:bold; cursor:pointer; margin-top:10px; }
-        .modal-lite .btn.primary { background:var(--primary); color:#fff; }
-        .modal-lite .btn.orange { background:#e67e22; color:#fff; }
-        .modal-lite .btn.outline { background:transparent; border:2px solid #e5e7eb; color:#111827; }
-        #qr-reader { width:100%; border-radius:12px; overflow:hidden; }
     </style>
 </head>
 <body>
@@ -111,26 +93,10 @@
     <h2>📋 Formulario de Auditoría</h2>
     
     <div class="header-info">
-        <div id="auditorRow"><label><strong>👤 Auditor</strong></label><select id="selectAuditor"></select></div>
-        <div id="auditorManualRow" style="display:none; margin-top:10px;">
-            <label><strong>✍️ Nombre del Auditor</strong></label>
-            <input id="inputAuditorManual" type="text" placeholder="Ej: Juan Pérez">
-            <div style="font-size:0.8em; color:#6b7280; margin-top:6px;">(Montacargas) No necesita estar registrado. Se guardará en la evaluación.</div>
-        </div>
+        <div><label><strong>👤 Auditor</strong></label><select id="selectAuditor"></select></div>
         <div style="margin-top:10px;">
             <label><strong>📦 Ubicación / Unidad</strong></label>
             <select id="selectBodega" onchange="filtrarYRenderizar()"></select>
-        
-        </div>
-        <!-- Montacargas: flujo por QR -->
-        <div id="scannerBox" class="scanner-box" style="display:none;">
-            <div style="font-weight:bold; color:#b45309;">🚜 Montacargas: escanea el QR de la unidad</div>
-            <div class="scan-status" id="scanStatus">Listo para escanear. Si no se abre la cámara, usa captura manual.</div>
-            <div class="scanner-actions">
-                <button class="btn-scan secondary" type="button" onclick="resetMontacargas()">↩️ Cambiar unidad</button>
-                <button class="btn-scan" type="button" onclick="abrirScanner()">📷 Escanear QR</button>
-                <button class="btn-scan secondary" type="button" onclick="abrirCapturaManual()">⌨️ Captura manual</button>
-            </div>
         </div>
     </div>
 
@@ -140,35 +106,6 @@
 </div>
 
 <button id="btn-finalizar" onclick="enviarEvaluacion()">💾 Guardar Evaluación</button>
-
-<!-- Modal Scanner QR -->
-<div id="modalScanner" class="modal-lite">
-  <div class="box">
-    <h3>📷 Escanear QR de Montacargas</h3>
-    <div id="qr-reader"></div>
-    <button class="btn outline" type="button" onclick="cerrarScanner()">Cerrar</button>
-  </div>
-</div>
-
-<!-- Modal Captura Manual -->
-<div id="modalManual" class="modal-lite">
-  <div class="box">
-    <h3>⌨️ Captura manual de QR</h3>
-    <input id="manualQr" type="text" placeholder="Pega el texto del QR o el ID de unidad...">
-    <button class="btn orange" type="button" onclick="procesarQR(document.getElementById('manualQr').value)">Usar QR</button>
-    <button class="btn outline" type="button" onclick="cerrarManual()">Cancelar</button>
-  </div>
-</div>
-
-<!-- Modal Operador -->
-<div id="modalOperador" class="modal-lite">
-  <div class="box">
-    <h3>👷 Nombre del Operador</h3>
-    <div style="font-size:0.9em; color:#6b7280;">No necesita estar registrado. Se guardará junto con la evaluación.</div>
-    <input id="operadorNombre" type="text" placeholder="Ej: Juan Pérez">
-    <button class="btn primary" type="button" onclick="confirmarOperador()">Continuar</button>
-  </div>
-</div>
 
 <script>
     const SUPABASE_URL = 'https://xjckzbegtvianurfvubp.supabase.co';
@@ -182,37 +119,20 @@
     let preguntasFiltradas = [];
     let bodegasData = [];
     let archivosAcumulados = {};
-    // --- Montacargas: QR + Operador ---
-    let operadorMontacargas = "";
-    let scannedBodegaId = "";
-    let qrScanner = null; // Html5Qrcode instance
-
 
     async function init() {
         document.getElementById('tipo-area-display').innerText = `Auditoría de ${tipoAuditoria}`;
         document.getElementById('btn-regresar').href = `menu_area.html?tipo=${tipoAuditoria}`;
         
-        // Montacargas: auditor manual (texto) + selección automática de unidad por QR
-        toggleAuditorModoMontacargas();
-
-        
         const { data: a } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
         document.getElementById('selectAuditor').innerHTML = '<option value="">Selecciona Auditor...</option>' + a.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
 
-        let { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoAuditoria).order('localizacion');
-        // Si no hay unidades por tipo (por datos inconsistentes), traer todo como fallback
-        if (!b || b.length === 0) {
-            const fb = await _supabase.from('bodegas').select('*').order('localizacion');
-            b = fb.data || [];
-        }
+        const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoAuditoria).order('localizacion');
         bodegasData = b;
         document.getElementById('selectBodega').innerHTML = '<option value="">Selecciona Unidad...</option>' + b.map(x => `<option value="${x.id}">${x.localizacion} | ${x.nombre}</option>`).join('');
 
         const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoAuditoria);
         preguntasMaestras = p.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
-
-        // Montacargas: auto-selección por QR si viene en el link
-        await autoStartMontacargas();
     }
 
     // --- NUEVA FUNCIÓN DE COMPRESIÓN ---
@@ -309,332 +229,8 @@
         });
     }
 
-    
-    
-    function toggleAuditorModoMontacargas() {
-        const isM = (tipoAuditoria === 'montacargas');
-        const rowSel = document.getElementById('auditorRow');
-        const rowMan = document.getElementById('auditorManualRow');
-        if (rowSel) rowSel.style.display = isM ? 'none' : 'block';
-        if (rowMan) rowMan.style.display = isM ? 'block' : 'none';
-    }
-
-function retryAutoStartMontacargas() {
-        // Si bodegas aún no cargan, reintentar una vez
-        if (!bodegasData || bodegasData.length === 0) {
-            setTimeout(()=>autoStartMontacargas(true), 400);
-            return true;
-        }
-        return false;
-    }
-
-    async function autoStartMontacargas(retry=false) {
-        if (tipoAuditoria !== 'montacargas') return;
-        if (!retry && retryAutoStartMontacargas()) return;
-
-
-        // Mostrar caja de escaneo
-        const box = document.getElementById('scannerBox');
-        if (box) box.style.display = 'block';
-
-
-        // Si viene unidad por URL, seleccionarla automáticamente
-        const unidadParam = urlParams.get('unidad') || urlParams.get('bodega') || urlParams.get('unidad_id');
-        if (unidadParam) {
-            await procesarQR(unidadParam);
-            return;
-        }
-
-        // Si viene un QR completo (URL o texto)
-        const qrParam = urlParams.get('qr');
-        if (qrParam) {
-            await procesarQR(qrParam);
-        }
-    }
-
-    function _autoPickAuditor() {
-        const sel = document.getElementById('selectAuditor');
-        if (!sel) return '';
-        // Si ya hay auditor seleccionado, regresar
-        if (sel.value) return sel.value;
-
-        // Opciones válidas (ignora placeholder vacío)
-        const opts = Array.from(sel.options || []).filter(o => (o.value || '').trim() !== '');
-
-        // Preferir un auditor tipo SISTEMA/AUTO si existe
-        const preferred = opts.find(o => (o.textContent || '').toUpperCase().includes('SISTEMA') || (o.textContent || '').toUpperCase().includes('AUTO'));
-        if (preferred) {
-            sel.value = preferred.value;
-            return preferred.value;
-        }
-
-        // Si no, elegir el primero disponible
-        if (opts.length > 0) {
-            sel.value = opts[0].value;
-            return sel.value;
-        }
-        return '';
-    }
-
-    function setScanStatus(msg) {
-        const el = document.getElementById('scanStatus');
-        if (el) el.innerText = msg;
-    }
-
-    
-    function _tryExtractUnidadId(text) {
-        const t = decodeURIComponent((text || '').trim());
-        if (!t) return '';
-
-        // 1) Si es URL con params
-        try {
-            if (t.startsWith('http://') || t.startsWith('https://')) {
-                const u = new URL(t);
-                return u.searchParams.get('unidad') || u.searchParams.get('bodega') || u.searchParams.get('unidad_id') || '';
-            }
-        } catch(e) {}
-
-        // 2) Si parece UUID, usarlo directo
-        const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (uuidRe.test(t)) return t;
-
-        // 3) Match directo por localizacion o nombre (ej: "m1")
-        const key = t.toString().trim().toLowerCase();
-        const norm = (s) => (s ?? '').toString().trim().toLowerCase();
-        const normTight = (s) => norm(s).replace(/\s+/g, '');
-
-        const direct = (bodegasData || []).find(b => {
-            const bl = norm(b.localizacion);
-            const bn = norm(b.nombre);
-            if (bl === key || bn === key) return true;
-            // También permitir "m1" vs "M1 " o "M 1"
-            if (normTight(b.localizacion) === key.replace(/\s+/g,'') || normTight(b.nombre) === key.replace(/\s+/g,'')) return true;
-            // Prefijo: "m1" vs "m1 - montacargas"
-            if (bn.startsWith(key) || bl.startsWith(key)) return true;
-            return false;
-        });
-        if (direct) return direct.id;
-
-        // 4) Si viene en formato "LOCALIZACION | NOMBRE"
-        const cleaned = t.replace(/\s+/g, ' ').trim();
-        const parts = cleaned.split('|').map(x => x.trim()).filter(Boolean);
-        if (parts.length >= 1) {
-            const loc = parts[0];
-            const nom = parts[1] || '';
-            const dl = loc.toLowerCase();
-            const dn = nom.toLowerCase();
-            const found = (bodegasData || []).find(b => {
-                const bl = norm(b.localizacion);
-                const bn = norm(b.nombre);
-                if (nom) return bl === dl && bn === dn;
-                return bl === dl || bn === dl;
-            });
-            if (found) return found.id;
-        }
-
-        return '';
-    }
-
-    async function procesarQR(textoQR) {
-        if (tipoAuditoria !== 'montacargas') return;
-        if (!retry && retryAutoStartMontacargas()) return;
-
-        let unidadId = _tryExtractUnidadId(textoQR);
-
-        if (!unidadId) {
-            // Fallback remoto: buscar por localizacion/nombre (ej: m1)
-            const raw = decodeURIComponent((textoQR || '').trim());
-            // Si viene algo como "aguascalientes | m1", tomar también el último token
-            const tokens = raw.split('|').map(x=>x.trim()).filter(Boolean);
-            const key = (tokens.length ? tokens[tokens.length-1] : raw).toLowerCase();
-            try {
-                const { data: fb } = await _supabase.from('bodegas').select('*')
-                    .or(`localizacion.eq.${key},nombre.eq.${key},localizacion.ilike.%${key}%,nombre.ilike.%${key}%`)
-                    .limit(1);
-                if (fb && fb.length > 0) {
-                    unidadId = fb[0].id;
-                    bodegasData = (bodegasData || []).concat(fb.filter(x => !(bodegasData || []).some(b => b.id === x.id)));
-                    const sel = document.getElementById('selectBodega');
-                    if (sel && !Array.from(sel.options).some(o => o.value == fb[0].id)) {
-                        sel.innerHTML += `<option value="${fb[0].id}">${fb[0].localizacion} | ${fb[0].nombre}</option>`;
-                    }
-                } else {
-                    alert("No pude identificar la unidad desde ese QR. Verifica que 'm1' exista como localización o nombre.");
-                    setScanStatus("❌ QR no reconocido. Intenta de nuevo.");
-                    return;
-                }
-            } catch(e) {
-                alert("No pude buscar la unidad en Supabase. Revisa tu conexión.");
-                setScanStatus("❌ Error buscando unidad.");
-                return;
-            }
-        }
-
-        const exists = (bodegasData || []).some(b => b.id == unidadId);
-        if (!exists) {
-            // Fallback: buscar en Supabase por id (por si bodegasData viene vacío o incompleto)
-            try {
-                const { data: fb } = await _supabase.from('bodegas').select('*')
-                    .eq('id', unidadId).limit(1);
-                if (fb && fb.length > 0) {
-                    bodegasData = (bodegasData || []).concat(fb.filter(x => !(bodegasData || []).some(b => b.id === x.id)));
-                    // Re-render select options si venía vacío
-                    const sel = document.getElementById('selectBodega');
-                    if (sel && !Array.from(sel.options).some(o => o.value == fb[0].id)) {
-                        sel.innerHTML += `<option value="${fb[0].id}">${fb[0].localizacion} | ${fb[0].nombre}</option>`;
-                    }
-                } else {
-                    alert("La unidad del QR no existe en el catálogo (bodegas). Revisa que el QR sea correcto.");
-                    setScanStatus("❌ Unidad no encontrada en Supabase.");
-                    return;
-                }
-            } catch(e) {
-                alert("No pude validar la unidad en Supabase. Revisa tu conexión.");
-                setScanStatus("❌ Error validando unidad.");
-                return;
-            }
-        }
-
-        scannedBodegaId = unidadId;
-        document.getElementById('selectBodega').value = unidadId;
-
-        // ensure option exists (por si no estaba en el select)
-        const sel = document.getElementById('selectBodega');
-        if (sel && !Array.from(sel.options).some(o => o.value == unidadId)) {
-            const found = (bodegasData || []).find(b => b.id == unidadId);
-            const label = found ? `${found.localizacion} | ${found.nombre}` : unidadId;
-            sel.innerHTML += `<option value="${unidadId}">${label}</option>`;
-            sel.value = unidadId;
-        }
-
-
-
-        // Para montacargas: si ya escaneó, ocultamos el selector para evitar cambio accidental
-        // document.getElementById('selectBodega').disabled = true;
-
-        setScanStatus("✅ Unidad seleccionada por QR. Ingresa operador para continuar.");
-        cerrarScanner();
-        cerrarManual();
-
-        // Pedir operador y luego renderizar
-        pedirOperador();
-    }
-
-    
-    function pedirOperador() {
-        if (tipoAuditoria !== 'montacargas') return;
-        if (!retry && retryAutoStartMontacargas()) return;
-
-
-        // Flujo simple: pedir por prompt (más confiable en celular)
-        const nombre = (window.prompt("Nombre del operador del montacargas:", operadorMontacargas || "") || "").trim();
-        if (!nombre) {
-            alert("⚠️ Necesito el nombre del operador para continuar.");
-            return;
-        }
-        operadorMontacargas = nombre;
-
-        // Ya con unidad+operador, renderizar preguntas
-        filtrarYRenderizar();
-    }
-
-    function confirmarOperador() {
-        const input = document.getElementById('operadorNombre');
-        const nombre = (input?.value || '').trim();
-        if (!nombre) {
-            alert("Ingresa el nombre del operador.");
-            return;
-        }
-        operadorMontacargas = nombre;
-        const modal = document.getElementById('modalOperador');
-        if (modal) modal.style.display = 'none';
-
-        // Ya con unidad+operador, renderizar preguntas
-        filtrarYRenderizar();
-    }
-
-    function abrirScanner() {
-        if (tipoAuditoria !== 'montacargas') return;
-        if (!retry && retryAutoStartMontacargas()) return;
-
-        const modal = document.getElementById('modalScanner');
-        if (modal) modal.style.display = 'block';
-
-        // Iniciar Html5Qrcode
-        if (!qrScanner) {
-            qrScanner = new Html5Qrcode("qr-reader");
-        }
-
-        setScanStatus("📷 Abriendo cámara...");
-        qrScanner.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 220, height: 220 } },
-            (decodedText) => {
-                // éxito
-                procesarQR(decodedText);
-            },
-            (err) => { /* silencioso */ }
-        ).catch((e) => {
-            console.warn("Scanner error:", e);
-            alert("No pude abrir la cámara. Usa captura manual.");
-            cerrarScanner();
-        });
-    }
-
-    function cerrarScanner() {
-        const modal = document.getElementById('modalScanner');
-        if (modal) modal.style.display = 'none';
-        if (qrScanner) {
-            // detener si está corriendo
-            try {
-                qrScanner.stop().then(() => {
-                    try { qrScanner.clear(); } catch(e) {}
-                }).catch(()=>{});
-            } catch(e) {}
-        }
-    }
-
-    function abrirCapturaManual() {
-        if (tipoAuditoria !== 'montacargas') return;
-        if (!retry && retryAutoStartMontacargas()) return;
-
-        const modal = document.getElementById('modalManual');
-        const input = document.getElementById('manualQr');
-        if (input) input.value = "";
-        if (modal) modal.style.display = 'block';
-        setTimeout(() => input && input.focus(), 150);
-    }
-
-    function cerrarManual() {
-        const modal = document.getElementById('modalManual');
-        if (modal) modal.style.display = 'none';
-    }
-
-
-    function resetMontacargas() {
-        if (tipoAuditoria !== 'montacargas') return;
-        if (!retry && retryAutoStartMontacargas()) return;
-
-        operadorMontacargas = "";
-        scannedBodegaId = "";
-        const sel = document.getElementById('selectBodega');
-        if (sel) { sel.disabled = false; sel.value = ""; }
-        setScanStatus("Listo para escanear. Si no se abre la cámara, usa captura manual.");
-        // Limpiar render
-        document.getElementById('renderArea').innerHTML = '<p style="text-align: center; color: #7f8c8d; padding: 20px;">Por favor, seleccione una ubicación para cargar el checklist correspondiente.</p>';
-        document.getElementById('realtime-progress').innerText = "0";
-        document.getElementById('realtime-total-q').innerText = "0";
-        document.getElementById('realtime-score').innerText = "0.0";
-    }
-
-function filtrarYRenderizar() {
+    function filtrarYRenderizar() {
         const bodegaId = document.getElementById('selectBodega').value;
-        // Montacargas: requerir operador una vez seleccionada la unidad por QR
-        if (tipoAuditoria === 'montacargas' && bodegaId && !operadorMontacargas) {
-            pedirOperador();
-            return;
-        }
-
         if (!bodegaId) {
             document.getElementById('renderArea').innerHTML = '<p style="text-align: center; color: #7f8c8d; padding: 20px;">Seleccione una ubicación.</p>';
             return;
@@ -791,19 +387,11 @@ function filtrarYRenderizar() {
 
     async function enviarEvaluacion() {
         const audId = document.getElementById('selectAuditor').value;
-        const auditorManual = (document.getElementById('inputAuditorManual')?.value || '').trim();
-
         const bodId = document.getElementById('selectBodega').value;
         const btn = document.getElementById('btn-finalizar');
         
-        
-        if (tipoAuditoria === 'montacargas') {
-            if (!bodId) return alert("⚠️ Falta la unidad (escanea el QR).");
-            if (!auditorManual) return alert("⚠️ Escribe el nombre del auditor.");
-        } else {
-            if (!audId || !bodId) return alert("⚠️ Selecciona Auditor y Ubicación.");
-        }
-if (preguntasFiltradas.length === 0) return alert("No hay preguntas para evaluar.");
+        if (!audId || !bodId) return alert("⚠️ Selecciona Auditor y Ubicación.");
+        if (preguntasFiltradas.length === 0) return alert("No hay preguntas para evaluar.");
 
         btn.innerText = "⏳ Guardando...";
         btn.disabled = true;
@@ -841,31 +429,11 @@ if (preguntasFiltradas.length === 0) return alert("No hay preguntas para evaluar
 
         const score = ((pObt / pTot) * 100).toFixed(2);
         const { data: evData, error: evErr } = await _supabase.from('evaluaciones').insert([{
-            // Montacargas: guardar operador (si aplica)
-
             bodega_id: bodId, auditor_id: audId, calificacion_final: score, tipo: tipoAuditoria
-            , auditor_manual: (tipoAuditoria==='montacargas'? auditorManual : null)
-            , auditor_nombre: (tipoAuditoria==='montacargas'? auditorManual : null)
-
-            , operador_nombre: (tipoAuditoria==='montacargas'? operadorMontacargas : null)
-            , operador: (tipoAuditoria==='montacargas'? operadorMontacargas : null)
-
         }]).select();
 
         if (!evErr) {
             await _supabase.from('respuestas').insert(respuestas.map(r => ({ ...r, evaluacion_id: evData[0].id })));
-            // Montacargas: respaldo del operador en tabla auxiliar (si existe). No bloquea si falla.
-            if (tipoAuditoria === 'montacargas' && operadorMontacargas) {
-                try {
-                    await _supabase.from('montacargas_operadores').insert([{
-                        evaluacion_id: evData[0].id,
-                        bodega_id: bodId,
-                        auditor_id: audId,
-                        nombre_operador: operadorMontacargas
-                    }]);
-                } catch(e) {}
-            }
-
             alert(`✅ Auditoría guardada con éxito: ${score}%`);
             window.location.href = `menu_area.html?tipo=${tipoAuditoria}`;
         } else {
