@@ -111,7 +111,7 @@
     <h2>📋 Formulario de Auditoría</h2>
     
     <div class="header-info">
-        <div><label><strong>👤 Auditor</strong></label><select id="selectAuditor"></select></div>
+        <div id="auditorRow"><label><strong>👤 Auditor</strong></label><select id="selectAuditor"></select></div>
         <div style="margin-top:10px;">
             <label><strong>📦 Ubicación / Unidad</strong></label>
             <select id="selectBodega" onchange="filtrarYRenderizar()"></select>
@@ -299,6 +299,13 @@
         const box = document.getElementById('scannerBox');
         if (box) box.style.display = 'block';
 
+        // Para Montacargas (por QR), no queremos que el usuario elija auditor.
+        // Auto-seleccionamos uno y ocultamos el selector.
+        _autoPickAuditor();
+        const aRow = document.getElementById('auditorRow');
+        if (aRow) aRow.style.display = 'none';
+
+
         // Si viene unidad por URL, seleccionarla automáticamente
         const unidadParam = urlParams.get('unidad') || urlParams.get('bodega') || urlParams.get('unidad_id');
         if (unidadParam) {
@@ -313,14 +320,40 @@
         }
     }
 
+    function _autoPickAuditor() {
+        const sel = document.getElementById('selectAuditor');
+        if (!sel) return '';
+        // Si ya hay auditor seleccionado, regresar
+        if (sel.value) return sel.value;
+
+        // Opciones válidas (ignora placeholder vacío)
+        const opts = Array.from(sel.options || []).filter(o => (o.value || '').trim() !== '');
+
+        // Preferir un auditor tipo SISTEMA/AUTO si existe
+        const preferred = opts.find(o => (o.textContent || '').toUpperCase().includes('SISTEMA') || (o.textContent || '').toUpperCase().includes('AUTO'));
+        if (preferred) {
+            sel.value = preferred.value;
+            return preferred.value;
+        }
+
+        // Si no, elegir el primero disponible
+        if (opts.length > 0) {
+            sel.value = opts[0].value;
+            return sel.value;
+        }
+        return '';
+    }
+
     function setScanStatus(msg) {
         const el = document.getElementById('scanStatus');
         if (el) el.innerText = msg;
     }
 
+    
     function _tryExtractUnidadId(text) {
-        const t = (text || '').trim();
+        const t = decodeURIComponent((text || '').trim());
         if (!t) return '';
+
         // 1) Si es URL con params
         try {
             if (t.startsWith('http://') || t.startsWith('https://')) {
@@ -328,28 +361,45 @@
                 return u.searchParams.get('unidad') || u.searchParams.get('bodega') || u.searchParams.get('unidad_id') || '';
             }
         } catch(e) {}
+
         // 2) Si parece UUID, usarlo directo
         const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (uuidRe.test(t)) return t;
 
-        // 3) Si viene en formato LOCALIZACION|NOMBRE
-        // o "localizacion | nombre" como se muestra en el select
+        // 3) Match directo por localizacion o nombre (ej: "m1")
+        const key = t.toString().trim().toLowerCase();
+        const norm = (s) => (s ?? '').toString().trim().toLowerCase();
+        const normTight = (s) => norm(s).replace(/\s+/g, '');
+
+        const direct = (bodegasData || []).find(b => {
+            const bl = norm(b.localizacion);
+            const bn = norm(b.nombre);
+            if (bl === key || bn === key) return true;
+            // También permitir "m1" vs "M1 " o "M 1"
+            if (normTight(b.localizacion) === key.replace(/\s+/g,'') || normTight(b.nombre) === key.replace(/\s+/g,'')) return true;
+            // Prefijo: "m1" vs "m1 - montacargas"
+            if (bn.startsWith(key) || bl.startsWith(key)) return true;
+            return false;
+        });
+        if (direct) return direct.id;
+
+        // 4) Si viene en formato "LOCALIZACION | NOMBRE"
         const cleaned = t.replace(/\s+/g, ' ').trim();
         const parts = cleaned.split('|').map(x => x.trim()).filter(Boolean);
         if (parts.length >= 1) {
             const loc = parts[0];
             const nom = parts[1] || '';
-            // Buscar por localizacion y/o nombre (case-insensitive)
+            const dl = loc.toLowerCase();
+            const dn = nom.toLowerCase();
             const found = (bodegasData || []).find(b => {
-                const bl = (b.localizacion || '').toString().trim().toLowerCase();
-                const bn = (b.nombre || '').toString().trim().toLowerCase();
-                const dl = loc.toLowerCase();
-                const dn = nom.toLowerCase();
+                const bl = norm(b.localizacion);
+                const bn = norm(b.nombre);
                 if (nom) return bl === dl && bn === dn;
-                return bl === dl || bn === dl; // si solo viene una parte, intentar match
+                return bl === dl || bn === dl;
             });
             if (found) return found.id;
         }
+
         return '';
     }
 
@@ -373,6 +423,12 @@
         scannedBodegaId = unidadId;
         document.getElementById('selectBodega').value = unidadId;
 
+        // Asegurar auditor automático y ocultar selector
+        _autoPickAuditor();
+        const aRow = document.getElementById('auditorRow');
+        if (aRow) aRow.style.display = 'none';
+
+
         // Para montacargas: si ya escaneó, ocultamos el selector para evitar cambio accidental
         document.getElementById('selectBodega').disabled = true;
 
@@ -384,13 +440,20 @@
         pedirOperador();
     }
 
+    
     function pedirOperador() {
         if (tipoAuditoria !== 'montacargas') return;
-        const modal = document.getElementById('modalOperador');
-        const input = document.getElementById('operadorNombre');
-        if (input) input.value = operadorMontacargas || "";
-        if (modal) modal.style.display = 'block';
-        setTimeout(() => input && input.focus(), 150);
+
+        // Flujo simple: pedir por prompt (más confiable en celular)
+        const nombre = (window.prompt("Nombre del operador del montacargas:", operadorMontacargas || "") || "").trim();
+        if (!nombre) {
+            alert("⚠️ Necesito el nombre del operador para continuar.");
+            return;
+        }
+        operadorMontacargas = nombre;
+
+        // Ya con unidad+operador, renderizar preguntas
+        filtrarYRenderizar();
     }
 
     function confirmarOperador() {
@@ -628,7 +691,20 @@ function filtrarYRenderizar() {
         const bodId = document.getElementById('selectBodega').value;
         const btn = document.getElementById('btn-finalizar');
         
-        if (!audId || !bodId) return alert("⚠️ Selecciona Auditor y Ubicación.");
+        
+        // Montacargas: auditor automático (no pedir al usuario)
+        let _audId = audId;
+        if (tipoAuditoria === 'montacargas' && !_audId) {
+            _audId = _autoPickAuditor();
+        }
+
+        if (tipoAuditoria === 'montacargas') {
+            if (!_audId) return alert("⚠️ No hay auditores registrados (necesito al menos 1 para guardar).");
+            if (!bodId) return alert("⚠️ Falta la unidad (escanea el QR).");
+        } else {
+            if (!_audId || !bodId) return alert("⚠️ Selecciona Auditor y Ubicación.");
+        }
+
         if (preguntasFiltradas.length === 0) return alert("No hay preguntas para evaluar.");
 
         btn.innerText = "⏳ Guardando...";
@@ -669,7 +745,7 @@ function filtrarYRenderizar() {
         const { data: evData, error: evErr } = await _supabase.from('evaluaciones').insert([{
             // Montacargas: guardar operador (si aplica)
 
-            bodega_id: bodId, auditor_id: audId, calificacion_final: score, tipo: tipoAuditoria
+            bodega_id: bodId, auditor_id: _audId, calificacion_final: score, tipo: tipoAuditoria
             , operador_nombre: (tipoAuditoria==='montacargas'? operadorMontacargas : null)
             , operador: (tipoAuditoria==='montacargas'? operadorMontacargas : null)
 
@@ -683,7 +759,7 @@ function filtrarYRenderizar() {
                     await _supabase.from('montacargas_operadores').insert([{
                         evaluacion_id: evData[0].id,
                         bodega_id: bodId,
-                        auditor_id: audId,
+                        auditor_id: _audId,
                         nombre_operador: operadorMontacargas
                     }]);
                 } catch(e) {}
