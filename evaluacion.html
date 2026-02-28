@@ -122,6 +122,7 @@
             <div style="font-weight:bold; color:#b45309;">🚜 Montacargas: escanea el QR de la unidad</div>
             <div class="scan-status" id="scanStatus">Listo para escanear. Si no se abre la cámara, usa captura manual.</div>
             <div class="scanner-actions">
+                <button class="btn-scan secondary" type="button" onclick="resetMontacargas()">↩️ Cambiar unidad</button>
                 <button class="btn-scan" type="button" onclick="abrirScanner()">📷 Escanear QR</button>
                 <button class="btn-scan secondary" type="button" onclick="abrirCapturaManual()">⌨️ Captura manual</button>
             </div>
@@ -299,12 +300,6 @@
         const box = document.getElementById('scannerBox');
         if (box) box.style.display = 'block';
 
-        // Para Montacargas (por QR), no queremos que el usuario elija auditor.
-        // Auto-seleccionamos uno y ocultamos el selector.
-        _autoPickAuditor();
-        const aRow = document.getElementById('auditorRow');
-        if (aRow) aRow.style.display = 'none';
-
 
         // Si viene unidad por URL, seleccionarla automáticamente
         const unidadParam = urlParams.get('unidad') || urlParams.get('bodega') || urlParams.get('unidad_id');
@@ -405,28 +400,62 @@
 
     async function procesarQR(textoQR) {
         if (tipoAuditoria !== 'montacargas') return;
-        const unidadId = _tryExtractUnidadId(textoQR);
+        let unidadId = _tryExtractUnidadId(textoQR);
 
         if (!unidadId) {
-            alert("No pude identificar la unidad desde ese QR. Verifica el contenido.");
-            setScanStatus("❌ QR no reconocido. Intenta de nuevo o usa captura manual.");
-            return;
+            // Fallback remoto: buscar por localizacion/nombre (ej: m1)
+            const key = decodeURIComponent((textoQR || '').trim()).toLowerCase();
+            try {
+                const { data: fb } = await _supabase.from('bodegas').select('*')
+                    .eq('tipo', tipoAuditoria)
+                    .or(`localizacion.ilike.%${key}%,nombre.ilike.%${key}%`)
+                    .limit(1);
+                if (fb && fb.length > 0) {
+                    unidadId = fb[0].id;
+                    bodegasData = (bodegasData || []).concat(fb.filter(x => !(bodegasData || []).some(b => b.id === x.id)));
+                    const sel = document.getElementById('selectBodega');
+                    if (sel && !Array.from(sel.options).some(o => o.value == fb[0].id)) {
+                        sel.innerHTML += `<option value="${fb[0].id}">${fb[0].localizacion} | ${fb[0].nombre}</option>`;
+                    }
+                } else {
+                    alert("No pude identificar la unidad desde ese QR. Verifica que 'm1' exista como localización o nombre.");
+                    setScanStatus("❌ QR no reconocido. Intenta de nuevo.");
+                    return;
+                }
+            } catch(e) {
+                alert("No pude buscar la unidad en Supabase. Revisa tu conexión.");
+                setScanStatus("❌ Error buscando unidad.");
+                return;
+            }
         }
 
         const exists = (bodegasData || []).some(b => b.id == unidadId);
         if (!exists) {
-            alert("La unidad del QR no existe en el catálogo (bodegas). Revisa que el QR sea correcto.");
-            setScanStatus("❌ Unidad no encontrada en Supabase.");
-            return;
+            // Fallback: buscar en Supabase por id (por si bodegasData viene vacío o incompleto)
+            try {
+                const { data: fb } = await _supabase.from('bodegas').select('*')
+                    .eq('tipo', tipoAuditoria).eq('id', unidadId).limit(1);
+                if (fb && fb.length > 0) {
+                    bodegasData = (bodegasData || []).concat(fb.filter(x => !(bodegasData || []).some(b => b.id === x.id)));
+                    // Re-render select options si venía vacío
+                    const sel = document.getElementById('selectBodega');
+                    if (sel && !Array.from(sel.options).some(o => o.value == fb[0].id)) {
+                        sel.innerHTML += `<option value="${fb[0].id}">${fb[0].localizacion} | ${fb[0].nombre}</option>`;
+                    }
+                } else {
+                    alert("La unidad del QR no existe en el catálogo (bodegas). Revisa que el QR sea correcto.");
+                    setScanStatus("❌ Unidad no encontrada en Supabase.");
+                    return;
+                }
+            } catch(e) {
+                alert("No pude validar la unidad en Supabase. Revisa tu conexión.");
+                setScanStatus("❌ Error validando unidad.");
+                return;
+            }
         }
 
         scannedBodegaId = unidadId;
         document.getElementById('selectBodega').value = unidadId;
-
-        // Asegurar auditor automático y ocultar selector
-        _autoPickAuditor();
-        const aRow = document.getElementById('auditorRow');
-        if (aRow) aRow.style.display = 'none';
 
 
         // Para montacargas: si ya escaneó, ocultamos el selector para evitar cambio accidental
@@ -522,6 +551,21 @@
     function cerrarManual() {
         const modal = document.getElementById('modalManual');
         if (modal) modal.style.display = 'none';
+    }
+
+
+    function resetMontacargas() {
+        if (tipoAuditoria !== 'montacargas') return;
+        operadorMontacargas = "";
+        scannedBodegaId = "";
+        const sel = document.getElementById('selectBodega');
+        if (sel) { sel.disabled = false; sel.value = ""; }
+        setScanStatus("Listo para escanear. Si no se abre la cámara, usa captura manual.");
+        // Limpiar render
+        document.getElementById('renderArea').innerHTML = '<p style="text-align: center; color: #7f8c8d; padding: 20px;">Por favor, seleccione una ubicación para cargar el checklist correspondiente.</p>';
+        document.getElementById('realtime-progress').innerText = "0";
+        document.getElementById('realtime-total-q').innerText = "0";
+        document.getElementById('realtime-score').innerText = "0.0";
     }
 
 function filtrarYRenderizar() {
@@ -692,20 +736,8 @@ function filtrarYRenderizar() {
         const btn = document.getElementById('btn-finalizar');
         
         
-        // Montacargas: auditor automático (no pedir al usuario)
-        let _audId = audId;
-        if (tipoAuditoria === 'montacargas' && !_audId) {
-            _audId = _autoPickAuditor();
-        }
-
-        if (tipoAuditoria === 'montacargas') {
-            if (!_audId) return alert("⚠️ No hay auditores registrados (necesito al menos 1 para guardar).");
-            if (!bodId) return alert("⚠️ Falta la unidad (escanea el QR).");
-        } else {
-            if (!_audId || !bodId) return alert("⚠️ Selecciona Auditor y Ubicación.");
-        }
-
-        if (preguntasFiltradas.length === 0) return alert("No hay preguntas para evaluar.");
+        if (!audId || !bodId) return alert("⚠️ Selecciona Auditor y Ubicación.");
+if (preguntasFiltradas.length === 0) return alert("No hay preguntas para evaluar.");
 
         btn.innerText = "⏳ Guardando...";
         btn.disabled = true;
@@ -745,7 +777,7 @@ function filtrarYRenderizar() {
         const { data: evData, error: evErr } = await _supabase.from('evaluaciones').insert([{
             // Montacargas: guardar operador (si aplica)
 
-            bodega_id: bodId, auditor_id: _audId, calificacion_final: score, tipo: tipoAuditoria
+            bodega_id: bodId, auditor_id: audId, calificacion_final: score, tipo: tipoAuditoria
             , operador_nombre: (tipoAuditoria==='montacargas'? operadorMontacargas : null)
             , operador: (tipoAuditoria==='montacargas'? operadorMontacargas : null)
 
@@ -759,7 +791,7 @@ function filtrarYRenderizar() {
                     await _supabase.from('montacargas_operadores').insert([{
                         evaluacion_id: evData[0].id,
                         bodega_id: bodId,
-                        auditor_id: _audId,
+                        auditor_id: audId,
                         nombre_operador: operadorMontacargas
                     }]);
                 } catch(e) {}
