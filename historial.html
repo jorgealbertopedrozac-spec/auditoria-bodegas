@@ -119,7 +119,8 @@
 
     <div class="table-container">
         <table>
-            <thead><tr><th>Fecha</th><th>Auditor</th><th>Ubicación/Ruta</th><th>Resultado</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Auditor</th>
+                    <th>Operador</th><th>Ubicación/Ruta</th><th>Resultado</th></tr></thead>
             <tbody id="lista-evaluaciones"></tbody>
         </table>
     </div>
@@ -220,7 +221,37 @@
 
         const { data } = await q.order('fecha', {ascending: false});
         lastEvaluaciones = data || [];
-        renderDashboard(data);
+
+        // --- Operador para auditor MONTACARGAS (se extrae de respuestas.observaciones: [Operador: ...]) ---
+        try {
+            const mcIds = (lastEvaluaciones || [])
+                .filter(ev => ((ev.auditores?.nombre || '') + '').trim().toLowerCase() === 'montacargas')
+                .map(ev => ev.id);
+
+            if (mcIds.length > 0) {
+                const { data: resp } = await _supabase
+                    .from('respuestas')
+                    .select('evaluacion_id, observaciones')
+                    .in('evaluacion_id', mcIds);
+
+                const extraer = (txt) => {
+                    const t = (txt || '').toString();
+                    const m = t.match(/\[Operador:\s*([^\]]+)\]/i);
+                    return m ? m[1].trim() : '';
+                };
+
+                const map = {};
+                for (const r of (resp || [])) {
+                    if (!map[r.evaluacion_id]) {
+                        const op = extraer(r.observaciones);
+                        if (op) map[r.evaluacion_id] = op;
+                    }
+                }
+                lastEvaluaciones = lastEvaluaciones.map(ev => ({ ...ev, operador: map[ev.id] || '' }));
+            }
+        } catch(e) { /* silencioso */ }
+
+        renderDashboard(lastEvaluaciones);
     }
 
     function _csvEscape(v) {
@@ -286,7 +317,7 @@
 
     async function renderDashboard(data) {
         if(!data || data.length === 0) {
-            document.getElementById('lista-evaluaciones').innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#999;">No hay auditorías registradas.</td></tr>';
+            document.getElementById('lista-evaluaciones').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#999;">No hay auditorías registradas.</td></tr>';
             document.getElementById('main-score').innerText = "0%";
             document.getElementById('res-pre').innerHTML = "";
             return;
@@ -300,6 +331,7 @@
             <tr onclick="verDetalle('${ev.id}', '${ev.bodegas.nombre}')">
                 <td>${new Date(ev.fecha).toLocaleDateString()}</td>
                 <td>${ev.auditores?.nombre || 'N/A'}</td>
+                <td>${ev.operador || '-'}</td>
                 <td>${ev.bodegas.nombre}</td>
                 <td style="font-weight:bold; color:${ev.calificacion_final>=90?'var(--success)':'var(--danger)'}">${ev.calificacion_final}%</td>
             </tr>`).join('');
