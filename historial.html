@@ -97,6 +97,7 @@
 
     <div class="filter-card">
         <div class="filter-group"><label>👤 Auditor</label><select id="f-aud" onchange="aplicarFiltros()"><option value="">Todos</option></select></div>
+        <div class="filter-group"><label>📌 Localización</label><select id="f-loc" onchange="onChangeLocalizacion()"><option value="">Todas</option></select></div>
         <div class="filter-group"><label>📍 Unidad/Bodega</label><select id="f-bod" onchange="aplicarFiltros()"><option value="">Todas</option></select></div>
         <div class="filter-group"><label>📅 Mes</label><select id="f-mes" onchange="aplicarFiltros()"></select></div>
         <div class="filter-group"><label>🗓️ Año</label><input type="number" id="f-anio" onchange="aplicarFiltros()"></div>
@@ -148,6 +149,7 @@
 
     // Cache del último resultado (para exportar CSV)
     let lastEvaluaciones = [];
+    let bodegasData = [];
 
     // Variables de control de Zoom
     let scale = 1, pointX = 0, pointY = 0, isPanning = false, start = { x: 0, y: 0 };
@@ -164,11 +166,38 @@
         document.getElementById('f-anio').value = h.getFullYear();
 
         const { data: a } = await _supabase.from('auditores').select('*').eq('activo', true).order('nombre');
-        const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoArea).order('nombre');
+        const { data: b } = await _supabase.from('bodegas').select('*').eq('tipo', tipoArea).order('localizacion');
 
         document.getElementById('f-aud').innerHTML += (a || []).map(x=>`<option value="${x.id}">${x.nombre}</option>`).join('');
-        document.getElementById('f-bod').innerHTML += (b || []).map(x=>`<option value="${x.id}">${x.nombre}</option>`).join('');
 
+        bodegasData = (b || []);
+        // Localizaciones únicas (para selector)
+        const locs = [...new Set(bodegasData.map(x => (x.localizacion || '').trim()).filter(Boolean))]
+            .sort((x, y) => x.localeCompare(y, undefined, { sensitivity: 'base' }));
+        document.getElementById('f-loc').innerHTML = '<option value="">Todas</option>' + locs.map(l => `<option value="${l}">${l}</option>`).join('');
+
+        // Todas las bodegas (se filtrarán por localización cuando se elija una)
+        document.getElementById('f-bod').innerHTML = '<option value="">Todas</option>' + bodegasData.map(x=>`<option value="${x.id}">${x.nombre}</option>`).join('');
+
+
+        aplicarFiltros();
+    }
+
+    function onChangeLocalizacion() {
+        // Al elegir localización, actualizamos el combo de bodegas/unidades
+        const loc = document.getElementById('f-loc').value;
+        const selBod = document.getElementById('f-bod');
+        const actual = selBod.value;
+
+        const lista = !loc ? bodegasData : bodegasData.filter(b => (b.localizacion || '').trim() === loc);
+        selBod.innerHTML = '<option value="">Todas</option>' + lista.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
+
+        // Si la bodega seleccionada ya no existe en la lista, se limpia
+        if (actual && !lista.some(x => String(x.id) === String(actual))) {
+            selBod.value = '';
+        } else {
+            selBod.value = actual;
+        }
         aplicarFiltros();
     }
 
@@ -182,6 +211,11 @@
                 .eq('tipo', tipoArea).gte('fecha', ini).lte('fecha', fin);
 
         if(document.getElementById('f-aud').value) q = q.eq('auditor_id', document.getElementById('f-aud').value);
+
+        const loc = document.getElementById('f-loc').value;
+        // Filtrar por campo de la tabla relacionada bodegas (localizacion)
+        if (loc) q = q.eq('bodegas.localizacion', loc);
+
         if(document.getElementById('f-bod').value) q = q.eq('bodega_id', document.getElementById('f-bod').value);
 
         const { data } = await q.order('fecha', {ascending: false});
