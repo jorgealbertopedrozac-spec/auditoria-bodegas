@@ -355,7 +355,8 @@ const getAreaURL = () => new URLSearchParams(window.location.search).get('tipo')
 
     async function cargarPreguntas() {
         const areaActual = getAreaURL();
-        const { data } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', areaActual);
+        const { data, error } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', areaActual).eq('activo', true);
+        if (error) { console.error(error); alert('Error cargando preguntas: ' + (error.message || error)); return; }
         if(!data) return;
 
         data.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
@@ -437,7 +438,8 @@ const getAreaURL = () => new URLSearchParams(window.location.search).get('tipo')
             pregunta: document.getElementById('p-pre').value, 
             ponderacion: parseFloat(document.getElementById('p-pts').value), 
             tipo: getAreaURL(), 
-            aplica_a_departamento: document.getElementById('p-depto-filtro').value 
+            aplica_a_departamento: document.getElementById('p-depto-filtro').value,
+            activo: true
         };
         if(editandoId) await _supabase.from('configuracion_preguntas').update(payload).eq('id', editandoId);
         else await _supabase.from('configuracion_preguntas').insert([payload]);
@@ -510,18 +512,46 @@ const getAreaURL = () => new URLSearchParams(window.location.search).get('tipo')
     }
 
     async function eliminarRegistro(tabla, id) {
-        if(confirm("¿Eliminar registro?")) { 
-            await _supabase.from(tabla).delete().eq('id', id); 
-            if(tabla==='auditores') cargarAuditores();
-            else if(tabla==='bodegas') cargarBodegas();
+        if (!confirm("¿Eliminar registro?")) return;
+
+        try {
+            // ✅ Preguntas: NO se borran físicamente para no romper historial -> se desactivan (soft delete)
+            if (tabla === 'configuracion_preguntas') {
+                const { error } = await _supabase
+                    .from('configuracion_preguntas')
+                    .update({ activo: false })
+                    .eq('id', id);
+
+                if (error) throw error;
+                await cargarPreguntas();
+                return;
+            }
+
+            // Otros catálogos: borrado normal
+            const { error } = await _supabase.from(tabla).delete().eq('id', id);
+            if (error) throw error;
+
+            if (tabla === 'auditores') cargarAuditores();
+            else if (tabla === 'bodegas') cargarBodegas();
             else cargarPreguntas();
+
+        } catch (e) {
+            console.error(e);
+            const msg = (e && (e.message || e.details || e.hint)) ? (e.message || e.details || e.hint) : String(e);
+
+            // Mensaje amigable para el caso típico (FK / conflicto)
+            if (String(e?.code || '').includes('23503') || String(msg).toLowerCase().includes('foreign key') || String(msg).includes('409')) {
+                alert("No se puede eliminar porque ya tiene registros relacionados (historial).\n\nEsta app ahora DESACTIVA preguntas en vez de borrarlas.\nSi sigues viendo este error, asegúrate de tener la columna 'activo' (boolean) en 'configuracion_preguntas'.");
+            } else {
+                alert("Error eliminando: " + msg);
+            }
         }
     }
 
     // Funciones de Backup (Se mantienen iguales)
     async function descargarDatosCSV() {
         const area = getAreaURL();
-        const { data: p } = await _supabase.from('configuracion_preguntas').select('titulo, desglose, pregunta, ponderacion, aplica_a_departamento').eq('tipo', area);
+        const { data: p } = await _supabase.from('configuracion_preguntas').select('titulo, desglose, pregunta, ponderacion, aplica_a_departamento').eq('tipo', area).eq('activo', true);
         const headers = "titulo,desglose,pregunta,ponderacion,aplica_a_departamento\n";
         const rows = p.map(p => [`"${p.titulo}"`, `"${p.desglose}"`, `"${p.pregunta}"`, p.ponderacion, `"${p.aplica_a_departamento}"`].join(",")).join("\n");
         const blob = new Blob(["\uFEFF" + headers + rows], { type: 'text/csv;charset=utf-8;' });

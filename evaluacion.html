@@ -131,7 +131,8 @@
         bodegasData = b;
         document.getElementById('selectBodega').innerHTML = '<option value="">Selecciona Unidad...</option>' + b.map(x => `<option value="${x.id}">${x.localizacion} | ${x.nombre}</option>`).join('');
 
-        const { data: p } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoAuditoria);
+        const { data: p, error: pErr } = await _supabase.from('configuracion_preguntas').select('*').eq('tipo', tipoAuditoria).eq('activo', true);
+        if(pErr){ console.error(pErr); alert('Error cargando preguntas: ' + (pErr.message || pErr)); return; }
         preguntasMaestras = p.sort((a, b) => a.desglose.localeCompare(b.desglose, undefined, { numeric: true }));
         // Montacargas: si viene QR/unidad en el link, auto-seleccionar y pedir auditor/operador (texto)
         await montacargasBoot();
