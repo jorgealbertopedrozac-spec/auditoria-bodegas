@@ -114,6 +114,12 @@
             width: 200px;
         }
 
+        .status-box { background:#eef7ff; border:1px solid #cfe8ff; color:#24527a; padding:10px; border-radius:8px; font-size:0.85em; margin-top:10px; }
+        .status-box.ok { background:#eafaf1; border-color:#bfe8d0; color:#1e7042; }
+        .status-box.warn { background:#fff8e5; border-color:#ffe0a3; color:#8a5a00; }
+        .mini-actions { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
+        .table-small td, .table-small th { font-size:0.78em; padding:8px; }
+
         @media (max-width: 600px) {
             .container { padding: 10px; }
             h2 { font-size: 1.2em; }
@@ -186,6 +192,7 @@
         <button class="tab active" onclick="switchTab('tab-preguntas')">📋 Preguntas</button>
         <button class="tab" onclick="switchTab('tab-bodegas')">📍 Ubicaciones/Unidad</button>
         <button class="tab" onclick="switchTab('tab-auditores')">👥 Auditores</button>
+        <button class="tab" id="tab-btn-base-nombres" onclick="switchTab('tab-base-nombres')">🪪 Base Nombres</button>
         <button class="tab" onclick="switchTab('tab-backup')">💾 CSV / Respaldo</button>
     </div>
 
@@ -232,6 +239,41 @@
         </div>
         <div style="overflow-x: auto;">
             <table><thead><tr><th>Nombre</th><th>Puesto</th><th class="col-actions">Acciones</th></tr></thead><tbody id="tbody-auditores"></tbody></table>
+        </div>
+    </div>
+
+
+    <div id="tab-base-nombres" class="section">
+        <div class="form-box">
+            <h3>🪪 Base de nombres para incidencias de almacén</h3>
+            <p style="margin-top:0; color:#64748b; font-size:0.9em;">
+                Este catálogo alimenta el módulo de escaneo de incidencias. Formato requerido del CSV:
+                <strong>codigo, descripcion, bodega</strong>.
+            </p>
+            <div class="mini-actions">
+                <button class="btn-action btn-outline" onclick="exportarBaseNombresCSV()">📥 Exportar base_nombres CSV</button>
+                <button class="btn-action btn-blue" onclick="cargarVistaBaseNombres()">🔄 Actualizar vista</button>
+            </div>
+            <hr>
+            <label>📤 Importar CSV de base_nombres</label>
+            <input type="file" id="baseNombresFile" accept=".csv,text/csv" style="margin-bottom:10px;">
+            <label style="display:flex; align-items:center; gap:8px; font-size:0.85em; font-weight:normal; color:#34495e; margin:10px 0;">
+                <input type="checkbox" id="baseNombresReplace" style="width:auto;">
+                Reemplazar base actual antes de importar
+            </label>
+            <button class="btn-action btn-orange" onclick="importarBaseNombresCSV()">📤 Importar base_nombres CSV</button>
+            <div id="base-nombres-status" class="status-box" style="display:none;"></div>
+        </div>
+
+        <div class="form-box">
+            <h3 style="margin-bottom:5px;">Registros cargados</h3>
+            <div id="base-nombres-resumen" style="font-size:0.85em; color:#64748b; margin-bottom:10px;">Sin cargar.</div>
+            <div style="overflow-x:auto;">
+                <table class="table-small">
+                    <thead><tr><th>Código</th><th>Descripción</th><th>Bodega</th><th>Activo</th></tr></thead>
+                    <tbody id="tbody-base-nombres"><tr><td colspan="4" style="text-align:center; color:#999;">Presiona “Actualizar vista”.</td></tr></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -343,6 +385,7 @@ const getAreaURL = () => new URLSearchParams(window.location.search).get('tipo')
         await cargarBodegas();
         await cargarAuditores();
         cargarPreguntas();
+        if (getAreaURL() === 'almacen') cargarVistaBaseNombres();
     }
 
     function switchTab(id) {
@@ -648,6 +691,269 @@ async function importarJSON() {
     };
     reader.readAsText(file);
 }
+
+// --- BASE_NOMBRES: EXPORTAR / IMPORTAR CSV PARA INCIDENCIAS DE ALMACÉN ---
+function mostrarEstadoBaseNombres(msg, tipo = '') {
+    const box = document.getElementById('base-nombres-status');
+    if (!box) return;
+    box.className = 'status-box ' + (tipo || '');
+    box.style.display = 'block';
+    box.innerText = msg;
+}
+
+function limpiarBOM(texto) {
+    return (texto || '').replace(/^\uFEFF/, '');
+}
+
+function csvEscape(valor) {
+    const s = (valor ?? '').toString();
+    return '"' + s.replace(/"/g, '""') + '"';
+}
+
+function descargarArchivoTexto(nombre, contenido, tipo = 'text/csv;charset=utf-8;') {
+    const blob = new Blob(['\uFEFF' + contenido], { type: tipo });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function parseCSV(texto) {
+    texto = limpiarBOM(texto);
+    const filas = [];
+    let fila = [];
+    let celda = '';
+    let enComillas = false;
+
+    for (let i = 0; i < texto.length; i++) {
+        const ch = texto[i];
+        const next = texto[i + 1];
+
+        if (ch === '"') {
+            if (enComillas && next === '"') {
+                celda += '"';
+                i++;
+            } else {
+                enComillas = !enComillas;
+            }
+        } else if (ch === ',' && !enComillas) {
+            fila.push(celda.trim());
+            celda = '';
+        } else if ((ch === '\n' || ch === '\r') && !enComillas) {
+            if (ch === '\r' && next === '\n') i++;
+            fila.push(celda.trim());
+            if (fila.some(x => x !== '')) filas.push(fila);
+            fila = [];
+            celda = '';
+        } else {
+            celda += ch;
+        }
+    }
+
+    fila.push(celda.trim());
+    if (fila.some(x => x !== '')) filas.push(fila);
+    return filas;
+}
+
+function normalizarHeader(h) {
+    return (h || '').toString().trim().toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '_');
+}
+
+function normalizarClaveBase(codigo, bodega) {
+    return `${(codigo || '').trim().toLowerCase()}||${(bodega || '').trim().toLowerCase()}`;
+}
+
+async function cargarVistaBaseNombres() {
+    const tbody = document.getElementById('tbody-base-nombres');
+    const resumen = document.getElementById('base-nombres-resumen');
+    if (!tbody || !resumen) return;
+
+    const { data, error } = await _supabase
+        .from('base_nombres')
+        .select('codigo, descripcion, bodega, activo, created_at')
+        .order('bodega', { ascending: true })
+        .order('codigo', { ascending: true })
+        .limit(300);
+
+    if (error) {
+        console.error(error);
+        tbody.innerHTML = `<tr><td colspan="4" style="color:var(--danger); text-align:center;">Error cargando base_nombres: ${error.message}</td></tr>`;
+        resumen.innerText = 'No se pudo cargar.';
+        return;
+    }
+
+    const total = data?.length || 0;
+    resumen.innerText = `Mostrando hasta 300 registros. Registros visibles: ${total}.`;
+    if (!total) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999;">No hay registros en base_nombres.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = data.map(r => `<tr>
+        <td><strong>${r.codigo || ''}</strong></td>
+        <td>${r.descripcion || ''}</td>
+        <td>${r.bodega || ''}</td>
+        <td>${r.activo ? '✅' : '⛔'}</td>
+    </tr>`).join('');
+}
+
+async function exportarBaseNombresCSV() {
+    mostrarEstadoBaseNombres('Exportando base_nombres...', '');
+
+    let todos = [];
+    let from = 0;
+    const pageSize = 1000;
+
+    while (true) {
+        const { data, error } = await _supabase
+            .from('base_nombres')
+            .select('codigo, descripcion, bodega, activo')
+            .order('bodega', { ascending: true })
+            .order('codigo', { ascending: true })
+            .range(from, from + pageSize - 1);
+
+        if (error) {
+            console.error(error);
+            mostrarEstadoBaseNombres('Error exportando: ' + error.message, 'warn');
+            return;
+        }
+
+        todos = todos.concat(data || []);
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
+    }
+
+    const headers = 'codigo,descripcion,bodega,activo\n';
+    const rows = todos.map(r => [
+        csvEscape(r.codigo),
+        csvEscape(r.descripcion),
+        csvEscape(r.bodega),
+        csvEscape(r.activo ? 'true' : 'false')
+    ].join(',')).join('\n');
+
+    const fecha = new Date().toISOString().slice(0, 10);
+    descargarArchivoTexto(`base_nombres_${fecha}.csv`, headers + rows);
+    mostrarEstadoBaseNombres(`✅ Exportación lista: ${todos.length} registros.`, 'ok');
+}
+
+async function importarBaseNombresCSV() {
+    const fileInput = document.getElementById('baseNombresFile');
+    const reemplazar = document.getElementById('baseNombresReplace')?.checked;
+
+    if (!fileInput || !fileInput.files.length) {
+        return alert('Selecciona un archivo CSV de base_nombres.');
+    }
+
+    const file = fileInput.files[0];
+    const text = await file.text();
+    const filas = parseCSV(text);
+
+    if (filas.length < 2) {
+        mostrarEstadoBaseNombres('El CSV no contiene registros.', 'warn');
+        return;
+    }
+
+    const headers = filas[0].map(normalizarHeader);
+    const idxCodigo = headers.indexOf('codigo');
+    const idxDescripcion = headers.indexOf('descripcion');
+    const idxBodega = headers.indexOf('bodega');
+    const idxActivo = headers.indexOf('activo');
+
+    if (idxCodigo < 0 || idxDescripcion < 0) {
+        mostrarEstadoBaseNombres('Formato inválido. El CSV debe incluir al menos: codigo, descripcion, bodega.', 'warn');
+        return;
+    }
+
+    const registros = [];
+    const claves = new Set();
+    let omitidos = 0;
+
+    filas.slice(1).forEach((cols) => {
+        const codigo = (cols[idxCodigo] || '').trim();
+        const descripcion = (cols[idxDescripcion] || '').trim();
+        const bodega = idxBodega >= 0 ? (cols[idxBodega] || '').trim() : '';
+        const activoTxt = idxActivo >= 0 ? (cols[idxActivo] || '').trim().toLowerCase() : 'true';
+        const activo = !['false', '0', 'no', 'inactivo'].includes(activoTxt);
+        const clave = normalizarClaveBase(codigo, bodega);
+
+        if (!codigo || !descripcion || claves.has(clave)) {
+            omitidos++;
+            return;
+        }
+
+        claves.add(clave);
+        registros.push({ codigo, descripcion, bodega, activo });
+    });
+
+    if (!registros.length) {
+        mostrarEstadoBaseNombres('No se encontraron registros válidos para importar.', 'warn');
+        return;
+    }
+
+    const accion = reemplazar ? 'REEMPLAZAR la base actual e importar' : 'importar/actualizar';
+    if (!confirm(`Se detectaron ${registros.length} registros válidos. ¿Deseas ${accion} base_nombres?`)) return;
+
+    mostrarEstadoBaseNombres('Importando base_nombres...', '');
+
+    try {
+        if (reemplazar) {
+            const { error: delError } = await _supabase.from('base_nombres').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+            if (delError) throw delError;
+        }
+
+        if (reemplazar) {
+            for (let i = 0; i < registros.length; i += 500) {
+                const chunk = registros.slice(i, i + 500);
+                const { error } = await _supabase.from('base_nombres').insert(chunk);
+                if (error) throw error;
+            }
+        } else {
+            const { data: existentes, error: selError } = await _supabase
+                .from('base_nombres')
+                .select('id, codigo, bodega');
+            if (selError) throw selError;
+
+            const mapa = new Map((existentes || []).map(r => [normalizarClaveBase(r.codigo, r.bodega), r.id]));
+            const insertar = [];
+            const actualizar = [];
+
+            registros.forEach(r => {
+                const id = mapa.get(normalizarClaveBase(r.codigo, r.bodega));
+                if (id) actualizar.push({ id, ...r });
+                else insertar.push(r);
+            });
+
+            for (let i = 0; i < insertar.length; i += 500) {
+                const chunk = insertar.slice(i, i + 500);
+                const { error } = await _supabase.from('base_nombres').insert(chunk);
+                if (error) throw error;
+            }
+
+            for (let i = 0; i < actualizar.length; i += 100) {
+                const chunk = actualizar.slice(i, i + 100);
+                await Promise.all(chunk.map(r => _supabase
+                    .from('base_nombres')
+                    .update({ descripcion: r.descripcion, bodega: r.bodega, activo: r.activo })
+                    .eq('id', r.id)
+                ));
+            }
+        }
+
+        fileInput.value = '';
+        mostrarEstadoBaseNombres(`✅ Importación terminada. Registros procesados: ${registros.length}. Omitidos por duplicado/formato: ${omitidos}.`, 'ok');
+        await cargarVistaBaseNombres();
+    } catch (e) {
+        console.error(e);
+        mostrarEstadoBaseNombres('Error importando: ' + (e.message || e.details || String(e)), 'warn');
+    }
+}
+
     init();
 </script>
 </body>

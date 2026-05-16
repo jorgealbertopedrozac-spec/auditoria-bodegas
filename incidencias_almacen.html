@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Incidencias Almacén</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        :root { --primary:#2c3e50; --success:#27ae60; --danger:#e74c3c; --warning:#f39c12; --accent:#3498db; --bg:#f4f7f6; }
+        body { font-family:'Segoe UI',sans-serif; background:var(--bg); margin:0; padding:10px 10px 90px; color:#2c3e50; }
+        .container { max-width:900px; margin:auto; }
+        .topbar { display:flex; justify-content:space-between; align-items:center; background:white; padding:14px; border-radius:14px; box-shadow:0 3px 12px rgba(0,0,0,.06); margin-bottom:12px; gap:10px; }
+        .topbar a { color:var(--primary); text-decoration:none; font-weight:bold; font-size:.85em; }
+        .badge { background:var(--danger); color:white; padding:6px 14px; border-radius:999px; font-size:.75em; font-weight:bold; letter-spacing:.8px; }
+        .card { background:white; padding:16px; border-radius:16px; box-shadow:0 3px 12px rgba(0,0,0,.06); margin-bottom:12px; }
+        h2 { margin:4px 0 10px; text-align:center; color:var(--primary); }
+        label { display:block; font-size:.75em; font-weight:bold; margin:10px 0 5px; color:#34495e; }
+        input, select, textarea { width:100%; padding:12px; border:1px solid #dfe6e9; border-radius:10px; box-sizing:border-box; font-size:16px; background:white; }
+        textarea { min-height:78px; resize:vertical; }
+        .scan-input { font-size:24px; font-weight:bold; text-align:center; letter-spacing:1px; border:2px solid var(--accent); padding-right:64px; }
+        .scan-box { position:relative; }
+        .scan-cam-btn {
+            position:absolute; right:8px; top:50%; transform:translateY(-50%);
+            width:46px; height:46px; border:none; border-radius:12px; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; font-size:1.25em;
+            color:white; background:var(--accent); box-shadow:0 2px 8px rgba(0,0,0,.12);
+        }
+        .scan-cam-btn.red { background:var(--danger); }
+        .scan-cam-btn.gray { background:#7f8c8d; cursor:not-allowed; }
+        .scan-hint { margin-top:6px; font-size:.8em; color:#6c7a89; }
+        .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        .btn { width:100%; border:none; border-radius:10px; padding:13px; font-weight:bold; cursor:pointer; color:white; margin-top:10px; font-size:1em; }
+        .btn-blue { background:var(--accent); }
+        .btn-green { background:var(--success); }
+        .btn-red { background:var(--danger); }
+        .btn-gray { background:#7f8c8d; }
+        .status { margin-top:12px; padding:12px; border-radius:10px; display:none; font-weight:bold; }
+        .ok { display:block; background:#eafaf1; color:#1e8449; border:1px solid #abebc6; }
+        .bad { display:block; background:#fdedec; color:#c0392b; border:1px solid #f5b7b1; }
+        .warn { display:block; background:#fff8e1; color:#996c00; border:1px solid #ffe082; }
+        .persona-box { background:#f8fbff; border-left:5px solid var(--accent); padding:12px; border-radius:10px; margin-top:12px; display:none; }
+        .persona-box h3 { margin:0 0 4px; }
+        .persona-box p { margin:2px 0; color:#566573; }
+        .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; }
+        .stat { background:#f8f9fa; border-radius:10px; padding:10px; text-align:center; }
+        .stat strong { display:block; font-size:1.4em; color:var(--primary); }
+        .video-wrap { display:none; margin-top:12px; background:#111; border-radius:14px; overflow:hidden; }
+        video { width:100%; max-height:330px; display:block; }
+        .scanner-modal { position:fixed; inset:0; background:rgba(15,23,42,.96); z-index:5000; display:none; flex-direction:column; align-items:center; justify-content:center; padding:22px; box-sizing:border-box; }
+        .scanner-box { width:100%; max-width:390px; background:white; border-radius:22px; overflow:hidden; box-shadow:0 18px 50px rgba(0,0,0,.35); }
+        #reader { width:100%; min-height:290px; }
+        .scanner-title { color:white; font-weight:bold; text-align:center; margin-bottom:14px; }
+        .scanner-close { margin-top:18px; background:rgba(255,255,255,.12); color:white; border:1px solid rgba(255,255,255,.25); padding:12px 28px; border-radius:999px; font-weight:bold; cursor:pointer; }
+        table { width:100%; border-collapse:collapse; background:white; min-width:680px; }
+        th, td { padding:10px; border-bottom:1px solid #edf2f7; text-align:left; font-size:.85em; }
+        th { background:#f8fafc; color:#64748b; text-transform:uppercase; font-size:.7em; }
+        .table-wrap { overflow-x:auto; border-radius:12px; }
+        .pill { display:inline-block; background:#ecf0f1; border-radius:999px; padding:3px 8px; font-size:.78em; font-weight:bold; }
+        .hidden { display:none !important; }
+        .auth-box { background:#f8f9fa; border:1px solid #e5e9ef; border-radius:12px; padding:12px; margin-bottom:12px; }
+        .auth-row { display:grid; grid-template-columns:1fr 1fr auto; gap:8px; align-items:end; }
+        .auth-msg { margin-top:8px; font-size:.85em; font-weight:bold; color:var(--danger); display:none; }
+        .btn-small { width:auto; min-width:130px; padding:12px 14px; margin-top:0; }
+        .private-note { text-align:center; color:#7f8c8d; padding:18px; background:#f8f9fa; border-radius:12px; font-weight:bold; }
+        @media (max-width:680px){ .row,.stats,.auth-row { grid-template-columns:1fr; } .topbar { flex-direction:column; align-items:stretch; text-align:center; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="topbar">
+        <a href="menu_area.html?tipo=almacen">⬅ Menú Almacén</a>
+        <span class="badge">INCIDENCIAS DE ALMACÉN</span>
+    </div>
+
+    <div class="card">
+        <h2>🚨 Escaneo de Incidencias</h2>
+        <div class="row">
+            <div>
+                <label>👤 Auditor / Responsable</label>
+                <select id="selectAuditor"><option value="">Sin auditor seleccionado</option></select>
+            </div>
+            <div>
+                <label>📦 Filtro bodega base</label>
+                <select id="filtroBodega"><option value="">Todas</option></select>
+            </div>
+        </div>
+
+        <label>📝 Observación opcional</label>
+        <textarea id="observaciones" placeholder="Opcional: motivo de la incidencia, comentario o evidencia verbal..."></textarea>
+
+        <label>🔎 Escanear / capturar código</label>
+        <div class="scan-box">
+            <input id="scanInput" class="scan-input" inputmode="numeric" autocomplete="off" placeholder="Escanea aquí" autofocus>
+            <button id="btnCamara" class="scan-cam-btn" type="button" onclick="toggleCamara()" title="Abrir cámara" aria-label="Abrir cámara">📷</button>
+        </div>
+        <div class="scan-hint">Toca el ícono de cámara dentro del recuadro para abrir el escáner.</div>
+        <button class="btn btn-green" onclick="registrarDesdeInput()">Registrar incidencia</button>
+        <div id="personaBox" class="persona-box"></div>
+        <div id="status" class="status"></div>
+
+        <div class="stats">
+            <div class="stat"><strong id="statBase">0</strong><span>Registros base</span></div>
+            <div class="stat"><strong id="statHoy">0</strong><span>Incidencias hoy</span></div>
+            <div class="stat"><strong id="statUltimo">--</strong><span>Último código</span></div>
+        </div>
+    </div>
+
+    <div class="card" id="historialIncidenciasCard">
+        <h3 style="margin-top:0;">🔒 Historial de incidencias</h3>
+
+        <div id="authIncidenciasBox" class="auth-box">
+            <div class="private-note">Esta sección está protegida con el mismo acceso del configurador. El registro de incidencias sigue funcionando libre; solo el historial requiere iniciar sesión.</div>
+            <div class="auth-row" style="margin-top:10px;">
+                <div>
+                    <label>Correo / Usuario del configurador</label>
+                    <input id="histEmail" type="email" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Correo del configurador">
+                </div>
+                <div>
+                    <label>Contraseña</label>
+                    <input id="histPass" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" placeholder="Contraseña del configurador" onkeyup="if(event.key==='Enter') desbloquearUltimasIncidencias()">
+                </div>
+                <button class="btn btn-blue btn-small" onclick="desbloquearUltimasIncidencias()">Ver historial</button>
+            </div>
+            <div id="authMsg" class="auth-msg">No se pudo iniciar sesión.</div>
+        </div>
+
+        <div id="ultimasIncidenciasWrap" class="table-wrap hidden" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+                <span style="font-size:.85em; color:#566573; font-weight:bold;">📋 Últimas incidencias</span>
+                <button class="btn btn-gray btn-small" onclick="bloquearUltimasIncidencias()">Bloquear</button>
+            </div>
+            <table>
+                <thead><tr><th>Fecha</th><th>Código</th><th>Nombre</th><th>Bodega</th><th>Observación</th><th>Auditor</th></tr></thead>
+                <tbody id="tbodyIncidencias"><tr><td colspan="6" style="text-align:center;color:#999;">Historial protegido.</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="modalScanner" class="scanner-modal">
+    <div class="scanner-title">Apunta al código para escanear</div>
+    <div class="scanner-box"><div id="reader"></div></div>
+    <button class="scanner-close" onclick="cerrarScanner()">Cerrar cámara</button>
+</div>
+
+<script>
+    const _sb = window._supabase;
+    let basePersonas = [];
+    let ultimoScan = { codigo:'', ts:0 };
+    let html5QrCode = null;
+    let scannerActivo = false;
+    let escaneandoCamara = false;
+    let historialAutorizado = false;
+
+    // El configurador real de esta app usa Supabase Auth con correo y contraseña.
+    // Este módulo usa exactamente el mismo inicio de sesión para desbloquear el historial.
+
+    const norm = v => String(v || '').trim().toLowerCase();
+    const escapeHtml = v => String(v || '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+
+    async function init() {
+        if (!_sb) {
+            mostrarStatus('No se pudo inicializar Supabase. Revisa supabase-config.js.', 'bad');
+            return;
+        }
+        await Promise.all([cargarAuditores(), cargarBaseNombres()]);
+        await cargarConteoHoy();
+        const input = document.getElementById('scanInput');
+        input.focus();
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') registrarDesdeInput(); });
+        input.addEventListener('input', () => mostrarPersona(input.value));
+
+        bloquearUltimasIncidencias();
+
+        if (typeof Html5Qrcode === 'undefined') {
+            const btnCam = document.getElementById('btnCamara');
+            btnCam.innerText = '📷';
+            btnCam.title = 'No se cargó el lector de cámara';
+            btnCam.setAttribute('aria-label', 'No se cargó el lector de cámara');
+            btnCam.className = 'scan-cam-btn gray';
+        }
+    }
+
+    async function cargarAuditores() {
+        const { data } = await _sb.from('auditores').select('id,nombre').eq('activo', true).order('nombre');
+        const sel = document.getElementById('selectAuditor');
+        sel.innerHTML = '<option value="">Sin auditor seleccionado</option>' + (data || []).map(a => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('');
+    }
+
+    async function cargarBaseNombres() {
+        const { data, error } = await _sb.from('base_nombres').select('codigo,descripcion,bodega').eq('activo', true).order('descripcion');
+        if (error) {
+            mostrarStatus('No existe o no se puede leer la tabla base_nombres. Ejecuta primero el SQL incluido.', 'bad');
+            return;
+        }
+        basePersonas = data || [];
+        document.getElementById('statBase').innerText = basePersonas.length;
+        const bodegas = [...new Set(basePersonas.map(x => x.bodega).filter(Boolean))].sort();
+        document.getElementById('filtroBodega').innerHTML = '<option value="">Todas</option>' + bodegas.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+    }
+
+    function buscarPersona(codigo) {
+        const c = norm(codigo);
+        const filtroBodega = document.getElementById('filtroBodega').value;
+        let matches = basePersonas.filter(p => norm(p.codigo) === c);
+        if (filtroBodega) matches = matches.filter(p => norm(p.bodega) === norm(filtroBodega));
+        return matches[0] || null;
+    }
+
+    function mostrarPersona(codigo) {
+        const box = document.getElementById('personaBox');
+        const c = String(codigo || '').trim();
+        if (!c) { box.style.display = 'none'; return; }
+        const p = buscarPersona(c);
+        if (p) {
+            box.style.display = 'block';
+            box.innerHTML = `<h3>${escapeHtml(p.descripcion)}</h3><p><b>Código:</b> ${escapeHtml(p.codigo)}</p><p><b>Bodega:</b> ${escapeHtml(p.bodega || '')}</p>`;
+        } else {
+            box.style.display = 'block';
+            box.innerHTML = `<h3 style="color:var(--danger);">Código no encontrado en base</h3><p><b>Código:</b> ${escapeHtml(c)}</p><p>Se registrará como incidencia sin nombre si confirmas.</p>`;
+        }
+    }
+
+    async function registrarDesdeInput() {
+        const input = document.getElementById('scanInput');
+        const codigo = String(input.value || '').trim();
+        if (!codigo) return mostrarStatus('Escanea o captura un código.', 'warn');
+        await registrarIncidencia(codigo);
+    }
+
+    async function registrarIncidencia(codigo) {
+        const now = Date.now();
+        if (norm(codigo) === norm(ultimoScan.codigo) && now - ultimoScan.ts < 1500) {
+            return mostrarStatus('Lectura duplicada ignorada para evitar doble registro.', 'warn');
+        }
+        ultimoScan = { codigo, ts: now };
+        const persona = buscarPersona(codigo);
+        const payload = {
+            codigo: String(codigo).trim(),
+            descripcion: persona ? persona.descripcion : 'NO ENCONTRADO EN BASE',
+            bodega: persona ? persona.bodega : document.getElementById('filtroBodega').value,
+            observaciones: document.getElementById('observaciones').value.trim() || null,
+            auditor_id: document.getElementById('selectAuditor').value || null,
+            origen: escaneandoCamara ? 'camara' : 'manual_lector'
+        };
+        const { error } = await _sb.from('incidencias_almacen').insert([payload]);
+        if (error) return mostrarStatus('Error al guardar incidencia: ' + error.message, 'bad');
+
+        document.getElementById('statUltimo').innerText = payload.codigo;
+        document.getElementById('scanInput').value = '';
+        document.getElementById('scanInput').focus();
+        mostrarPersona('');
+        mostrarStatus(`✅ Incidencia registrada: ${payload.codigo} - ${payload.descripcion}`, persona ? 'ok' : 'warn');
+        await cargarConteoHoy();
+        if (historialAutorizado) await cargarIncidencias();
+    }
+
+    async function desbloquearUltimasIncidencias() {
+        const email = document.getElementById('histEmail').value.trim();
+        const password = document.getElementById('histPass').value;
+        const msg = document.getElementById('authMsg');
+        msg.style.display = 'none';
+        msg.innerText = '';
+
+        if (!email || !password) {
+            msg.innerText = 'Captura el mismo correo/usuario y contraseña que usas en Configuración.';
+            msg.style.display = 'block';
+            return;
+        }
+
+        const { error } = await _sb.auth.signInWithPassword({ email, password });
+        if (error) {
+            console.error(error);
+            historialAutorizado = false;
+            msg.innerText = error.message || 'No se pudo iniciar sesión con el acceso del configurador.';
+            msg.style.display = 'block';
+            document.getElementById('histPass').value = '';
+            document.getElementById('histPass').focus();
+            return;
+        }
+
+        historialAutorizado = true;
+        msg.style.display = 'none';
+        document.getElementById('authIncidenciasBox').classList.add('hidden');
+        const wrap = document.getElementById('ultimasIncidenciasWrap');
+        wrap.classList.remove('hidden');
+        wrap.style.display = 'block';
+        await cargarIncidencias();
+    }
+
+    function bloquearUltimasIncidencias() {
+        historialAutorizado = false;
+        const emailInput = document.getElementById('histEmail');
+        if (emailInput) emailInput.value = '';
+        document.getElementById('histPass').value = '';
+        document.getElementById('tbodyIncidencias').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;">Cargando...</td></tr>';
+        const wrap = document.getElementById('ultimasIncidenciasWrap');
+        wrap.classList.add('hidden');
+        wrap.style.display = 'none';
+        document.getElementById('authIncidenciasBox').classList.remove('hidden');
+    }
+
+    async function cargarConteoHoy() {
+        const ini = new Date(); ini.setHours(0,0,0,0);
+        const { count } = await _sb.from('incidencias_almacen').select('id', { count:'exact', head:true }).gte('fecha', ini.toISOString());
+        document.getElementById('statHoy').innerText = count || 0;
+    }
+
+    async function cargarIncidencias() {
+        if (!historialAutorizado) return;
+        const { data, error } = await _sb.from('incidencias_almacen').select('*, auditores(nombre)').order('fecha', { ascending:false }).limit(50);
+        const tbody = document.getElementById('tbodyIncidencias');
+        if (error) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#c0392b;">No se pudo cargar incidencias. Ejecuta el SQL incluido.</td></tr>';
+            return;
+        }
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;">Sin incidencias registradas.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(r => `<tr>
+            <td>${new Date(r.fecha).toLocaleString()}</td>
+            <td><span class="pill">${escapeHtml(r.codigo)}</span></td>
+            <td>${escapeHtml(r.descripcion)}</td>
+            <td>${escapeHtml(r.bodega || '')}</td>
+            <td>${escapeHtml(r.observaciones || '')}</td>
+            <td>${escapeHtml(r.auditores?.nombre || '')}</td>
+        </tr>`).join('');
+    }
+
+    function mostrarStatus(msg, tipo) {
+        const st = document.getElementById('status');
+        st.className = 'status ' + tipo;
+        st.innerText = msg;
+    }
+
+    function getScannerFormats() {
+        if (typeof Html5QrcodeSupportedFormats === 'undefined') return undefined;
+        return [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.ITF
+        ];
+    }
+
+    function getScannerConfig() {
+        const side = Math.min(window.innerWidth || 320, 320);
+        const boxWidth = Math.max(240, Math.min(320, Math.floor(side * 0.9)));
+        return {
+            fps: 12,
+            aspectRatio: 16 / 9,
+            qrbox: { width: boxWidth, height: Math.floor(boxWidth * 0.45) },
+            disableFlip: false,
+            rememberLastUsedCamera: true,
+            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+            formatsToSupport: getScannerFormats(),
+            videoConstraints: { facingMode: { ideal: 'environment' } }
+        };
+    }
+
+    async function toggleCamara() {
+        if (scannerActivo) return cerrarScanner();
+        return abrirScanner();
+    }
+
+    async function abrirScanner() {
+        if (typeof Html5Qrcode === 'undefined') {
+            return mostrarStatus('No se cargó el lector de cámara. Revisa conexión a internet o usa lector/manual.', 'warn');
+        }
+        document.getElementById('modalScanner').style.display = 'flex';
+        document.getElementById('reader').innerHTML = '';
+        html5QrCode = new Html5Qrcode('reader', { verbose: false });
+        scannerActivo = true;
+        escaneandoCamara = true;
+        const btnCam = document.getElementById('btnCamara');
+        btnCam.innerText = '⛔';
+        btnCam.title = 'Detener cámara';
+        btnCam.setAttribute('aria-label', 'Detener cámara');
+        btnCam.className = 'scan-cam-btn red';
+        await startScannerWithConfig();
+    }
+
+    async function startScannerWithConfig() {
+        const config = getScannerConfig();
+        const cameraConfig = { facingMode: { exact: 'environment' } };
+        const onScanSuccess = async (txt) => {
+            const codigo = String(txt || '').trim();
+            if (!codigo) return;
+            await cerrarScanner();
+            await registrarIncidencia(codigo);
+        };
+        try {
+            await html5QrCode.start(cameraConfig, config, onScanSuccess);
+            return;
+        } catch (firstError) {
+            try {
+                const cameras = await Html5Qrcode.getCameras();
+                const rearCamera = (cameras || []).find(c => /back|rear|environment|wide/i.test(c.label || '')) || (cameras || [])[0];
+                if (!rearCamera?.id) throw firstError;
+                await html5QrCode.start({ deviceId: { exact: rearCamera.id } }, config, onScanSuccess);
+                return;
+            } catch (secondError) {
+                console.error('Error al iniciar escáner', firstError, secondError);
+                cerrarScanner(true);
+                mostrarStatus('No se pudo iniciar la cámara. Revisa permisos del navegador y que la página esté en HTTPS.', 'bad');
+            }
+        }
+    }
+
+    async function cerrarScanner(forceClose = false) {
+        const closeUi = () => {
+            const modal = document.getElementById('modalScanner');
+            if (modal) modal.style.display = 'none';
+            const reader = document.getElementById('reader');
+            if (reader) reader.innerHTML = '';
+            html5QrCode = null;
+            scannerActivo = false;
+            escaneandoCamara = false;
+            const btnCam = document.getElementById('btnCamara');
+            if (btnCam) {
+                btnCam.innerText = '📷';
+                btnCam.title = 'Abrir cámara';
+                btnCam.setAttribute('aria-label', 'Abrir cámara');
+                btnCam.className = 'scan-cam-btn';
+            }
+        };
+
+        if (!html5QrCode) { closeUi(); return; }
+        if (forceClose) {
+            try { await html5QrCode.clear(); } catch(_) {}
+            closeUi();
+            return;
+        }
+        try { await html5QrCode.stop(); } catch(_) {}
+        try { await html5QrCode.clear(); } catch(_) {}
+        closeUi();
+    }
+
+    window.addEventListener('beforeunload', () => cerrarScanner(true));
+    init();
+</script>
+</body>
+</html>

@@ -56,6 +56,14 @@
                     <p>Preguntas y unidades del área</p>
                 </div>
             </a>
+
+            <a id="link-incidencias" href="#" class="nav-card" style="border-left: 6px solid #e74c3c; display:none;">
+                <span class="icon">🚨</span>
+                <div class="info">
+                    <h3>Incidencias Almacén</h3>
+                    <p>Escanear personal y registrar incidencias</p>
+                </div>
+            </a>
         </div>
 
         <a href="index.html" class="btn-volver">⬅ Cambiar de Área</a>
@@ -72,6 +80,11 @@
         document.getElementById('link-eval').href = `evaluacion.html?tipo=${tipo}`;
         document.getElementById('link-hist').href = `historial.html?tipo=${tipo}`;
         document.getElementById('link-conf').href = `configurador.html?tipo=${tipo}`;
+        const linkIncidencias = document.getElementById('link-incidencias');
+        if (tipo === 'almacen') {
+            linkIncidencias.style.display = 'flex';
+            linkIncidencias.href = 'incidencias_almacen.html?tipo=almacen';
+        }
     </script>
 </body>
 </html>

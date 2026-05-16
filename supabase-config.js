@@ -1,4 +1,4 @@
-window.APP_VERSION = 'v2026.03.30.1';
+window.APP_VERSION = 'v2026.05.16.1-incidencias';
 window.SUPABASE_URL = 'https://xjckzbegtvianurfvubp.supabase.co';
 window.SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqY2t6YmVndHZpYW51cmZ2dWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxOTYzMzUsImV4cCI6MjA4Mjc3MjMzNX0.64zrKi0p1KiDwtBODLRf8O4sRvnn0o9QyoQUYHvVFd0';
 
