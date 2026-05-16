@@ -19,14 +19,16 @@
         label { display:block; font-size:.75em; font-weight:bold; margin:10px 0 5px; color:#34495e; }
         input, select, textarea { width:100%; padding:12px; border:1px solid #dfe6e9; border-radius:10px; box-sizing:border-box; font-size:16px; background:white; }
         textarea { min-height:78px; resize:vertical; }
-        .scan-input { font-size:24px; font-weight:bold; text-align:center; letter-spacing:1px; border:2px solid var(--accent); padding-right:64px; }
+        .scan-input { font-size:24px; font-weight:bold; text-align:center; letter-spacing:1px; border:2px solid var(--accent); padding-right:116px; }
         .scan-box { position:relative; }
-        .scan-cam-btn {
-            position:absolute; right:8px; top:50%; transform:translateY(-50%);
+        .scan-cam-btn, .scan-search-btn {
+            position:absolute; top:50%; transform:translateY(-50%);
             width:46px; height:46px; border:none; border-radius:12px; cursor:pointer;
             display:flex; align-items:center; justify-content:center; font-size:1.25em;
-            color:white; background:var(--accent); box-shadow:0 2px 8px rgba(0,0,0,.12);
+            color:white; box-shadow:0 2px 8px rgba(0,0,0,.12);
         }
+        .scan-cam-btn { right:8px; background:var(--accent); }
+        .scan-search-btn { right:60px; background:var(--primary); }
         .scan-cam-btn.red { background:var(--danger); }
         .scan-cam-btn.gray { background:#7f8c8d; cursor:not-allowed; }
         .scan-hint { margin-top:6px; font-size:.8em; color:#6c7a89; }
@@ -43,7 +45,7 @@
         .persona-box { background:#f8fbff; border-left:5px solid var(--accent); padding:12px; border-radius:10px; margin-top:12px; display:none; }
         .persona-box h3 { margin:0 0 4px; }
         .persona-box p { margin:2px 0; color:#566573; }
-        .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; }
+        .stats { display:grid; grid-template-columns:1fr; gap:8px; margin-top:10px; max-width:260px; margin-left:auto; margin-right:auto; }
         .stat { background:#f8f9fa; border-radius:10px; padding:10px; text-align:center; }
         .stat strong { display:block; font-size:1.4em; color:var(--primary); }
         .video-wrap { display:none; margin-top:12px; background:#111; border-radius:14px; overflow:hidden; }
@@ -53,6 +55,18 @@
         #reader { width:100%; min-height:290px; }
         .scanner-title { color:white; font-weight:bold; text-align:center; margin-bottom:14px; }
         .scanner-close { margin-top:18px; background:rgba(255,255,255,.12); color:white; border:1px solid rgba(255,255,255,.25); padding:12px 28px; border-radius:999px; font-weight:bold; cursor:pointer; }
+        .search-modal { position:fixed; inset:0; background:rgba(15,23,42,.88); z-index:4900; display:none; align-items:center; justify-content:center; padding:16px; box-sizing:border-box; }
+        .search-card { width:100%; max-width:720px; max-height:88vh; overflow:hidden; background:white; border-radius:20px; box-shadow:0 18px 50px rgba(0,0,0,.35); display:flex; flex-direction:column; }
+        .search-header { padding:16px; border-bottom:1px solid #edf2f7; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+        .search-header h3 { margin:0; color:var(--primary); font-size:1.05em; }
+        .search-close { border:none; background:#fdeaea; color:var(--danger); padding:8px 12px; border-radius:10px; font-weight:bold; cursor:pointer; }
+        .search-body { padding:14px; overflow-y:auto; }
+        .search-results { display:grid; gap:8px; margin-top:12px; }
+        .search-item { width:100%; text-align:left; border:1px solid #e5e9ef; background:#f8fbff; border-left:5px solid var(--accent); border-radius:12px; padding:11px; cursor:pointer; color:#2c3e50; }
+        .search-item strong { display:block; margin-bottom:3px; }
+        .search-item small { color:#64748b; display:block; line-height:1.35; }
+        .search-empty { text-align:center; color:#7f8c8d; padding:18px; background:#f8f9fa; border-radius:12px; }
+
         table { width:100%; border-collapse:collapse; background:white; min-width:680px; }
         th, td { padding:10px; border-bottom:1px solid #edf2f7; text-align:left; font-size:.85em; }
         th { background:#f8fafc; color:#64748b; text-transform:uppercase; font-size:.7em; }
@@ -76,15 +90,9 @@
 
     <div class="card">
         <h2>🚨 Escaneo de Incidencias</h2>
-        <div class="row">
-            <div>
-                <label>👤 Auditor / Responsable</label>
-                <select id="selectAuditor"><option value="">Sin auditor seleccionado</option></select>
-            </div>
-            <div>
-                <label>📦 Filtro bodega base</label>
-                <select id="filtroBodega"><option value="">Todas</option></select>
-            </div>
+        <div>
+            <label>👤 Auditor / Responsable</label>
+            <select id="selectAuditor"><option value="">Sin auditor seleccionado</option></select>
         </div>
 
         <label>📝 Observación opcional</label>
@@ -93,17 +101,16 @@
         <label>🔎 Escanear / capturar código</label>
         <div class="scan-box">
             <input id="scanInput" class="scan-input" inputmode="numeric" autocomplete="off" placeholder="Escanea aquí" autofocus>
+            <button id="btnBuscarCodigo" class="scan-search-btn" type="button" onclick="abrirBuscadorCodigos()" title="Buscar por nombre o código" aria-label="Buscar por nombre o código">🔍</button>
             <button id="btnCamara" class="scan-cam-btn" type="button" onclick="toggleCamara()" title="Abrir cámara" aria-label="Abrir cámara">📷</button>
         </div>
-        <div class="scan-hint">Toca el ícono de cámara dentro del recuadro para abrir el escáner.</div>
+        <div class="scan-hint">Toca la lupa para buscar manualmente por nombre/código o la cámara para escanear.</div>
         <button class="btn btn-green" onclick="registrarDesdeInput()">Registrar incidencia</button>
         <div id="personaBox" class="persona-box"></div>
         <div id="status" class="status"></div>
 
         <div class="stats">
-            <div class="stat"><strong id="statBase">0</strong><span>Registros base</span></div>
             <div class="stat"><strong id="statHoy">0</strong><span>Incidencias hoy</span></div>
-            <div class="stat"><strong id="statUltimo">--</strong><span>Último código</span></div>
         </div>
     </div>
 
@@ -131,10 +138,29 @@
                 <span style="font-size:.85em; color:#566573; font-weight:bold;">📋 Últimas incidencias</span>
                 <button class="btn btn-gray btn-small" onclick="bloquearUltimasIncidencias()">Bloquear</button>
             </div>
+            <div style="margin-bottom:10px; max-width:360px;">
+                <label>📦 Filtrar historial por bodega</label>
+                <select id="histFiltroBodega" onchange="cargarIncidencias()"><option value="">Todas</option></select>
+            </div>
             <table>
                 <thead><tr><th>Fecha</th><th>Código</th><th>Nombre</th><th>Bodega</th><th>Observación</th><th>Auditor</th></tr></thead>
                 <tbody id="tbodyIncidencias"><tr><td colspan="6" style="text-align:center;color:#999;">Historial protegido.</td></tr></tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+
+<div id="modalBuscador" class="search-modal">
+    <div class="search-card">
+        <div class="search-header">
+            <h3>🔍 Buscar código en base_nombres</h3>
+            <button class="search-close" onclick="cerrarBuscadorCodigos()">Cerrar</button>
+        </div>
+        <div class="search-body">
+            <label>Nombre, código o bodega</label>
+            <input id="buscadorCodigoInput" type="search" autocomplete="off" placeholder="Ej: JUAN, 12345, BODEGA..." oninput="filtrarCodigosBase()" onkeyup="if(event.key==='Enter') seleccionarPrimerResultado()">
+            <div id="resultadosCodigos" class="search-results"><div class="search-empty">Escribe para buscar.</div></div>
         </div>
     </div>
 </div>
@@ -196,16 +222,14 @@
             return;
         }
         basePersonas = data || [];
-        document.getElementById('statBase').innerText = basePersonas.length;
         const bodegas = [...new Set(basePersonas.map(x => x.bodega).filter(Boolean))].sort();
-        document.getElementById('filtroBodega').innerHTML = '<option value="">Todas</option>' + bodegas.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+        const histSel = document.getElementById('histFiltroBodega');
+        if (histSel) histSel.innerHTML = '<option value="">Todas</option>' + bodegas.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
     }
 
     function buscarPersona(codigo) {
         const c = norm(codigo);
-        const filtroBodega = document.getElementById('filtroBodega').value;
-        let matches = basePersonas.filter(p => norm(p.codigo) === c);
-        if (filtroBodega) matches = matches.filter(p => norm(p.bodega) === norm(filtroBodega));
+        const matches = basePersonas.filter(p => norm(p.codigo) === c);
         return matches[0] || null;
     }
 
@@ -221,6 +245,61 @@
             box.style.display = 'block';
             box.innerHTML = `<h3 style="color:var(--danger);">Código no encontrado en base</h3><p><b>Código:</b> ${escapeHtml(c)}</p><p>Se registrará como incidencia sin nombre si confirmas.</p>`;
         }
+    }
+
+
+    function abrirBuscadorCodigos() {
+        const modal = document.getElementById('modalBuscador');
+        const input = document.getElementById('buscadorCodigoInput');
+        modal.style.display = 'flex';
+        input.value = '';
+        document.getElementById('resultadosCodigos').innerHTML = '<div class="search-empty">Escribe para buscar.</div>';
+        setTimeout(() => input.focus(), 80);
+    }
+
+    function cerrarBuscadorCodigos() {
+        document.getElementById('modalBuscador').style.display = 'none';
+        document.getElementById('scanInput').focus();
+    }
+
+    function filtrarCodigosBase() {
+        const term = norm(document.getElementById('buscadorCodigoInput').value);
+        const cont = document.getElementById('resultadosCodigos');
+        if (!term) {
+            cont.innerHTML = '<div class="search-empty">Escribe para buscar.</div>';
+            return;
+        }
+        const tokens = term.split(/\s+/).filter(Boolean);
+        const resultados = basePersonas.filter(p => {
+            const txt = norm(`${p.codigo} ${p.descripcion} ${p.bodega || ''}`);
+            return tokens.every(t => txt.includes(t));
+        }).slice(0, 40);
+
+        if (resultados.length === 0) {
+            cont.innerHTML = '<div class="search-empty">Sin coincidencias.</div>';
+            return;
+        }
+
+        cont.innerHTML = resultados.map((p, i) => `<button class="search-item" type="button" onclick="seleccionarCodigoBase(${i})" data-codigo="${escapeHtml(p.codigo)}">
+            <strong>${escapeHtml(p.descripcion || 'Sin nombre')}</strong>
+            <small><b>Código:</b> ${escapeHtml(p.codigo)} &nbsp; | &nbsp; <b>Bodega:</b> ${escapeHtml(p.bodega || '')}</small>
+        </button>`).join('');
+        window.__resultadosBusquedaCodigos = resultados;
+    }
+
+    function seleccionarPrimerResultado() {
+        const arr = window.__resultadosBusquedaCodigos || [];
+        if (arr.length > 0) seleccionarCodigoBase(0);
+    }
+
+    function seleccionarCodigoBase(idx) {
+        const arr = window.__resultadosBusquedaCodigos || [];
+        const p = arr[idx];
+        if (!p) return;
+        const input = document.getElementById('scanInput');
+        input.value = p.codigo || '';
+        mostrarPersona(input.value);
+        cerrarBuscadorCodigos();
     }
 
     async function registrarDesdeInput() {
@@ -240,7 +319,7 @@
         const payload = {
             codigo: String(codigo).trim(),
             descripcion: persona ? persona.descripcion : 'NO ENCONTRADO EN BASE',
-            bodega: persona ? persona.bodega : document.getElementById('filtroBodega').value,
+            bodega: persona ? persona.bodega : null,
             observaciones: document.getElementById('observaciones').value.trim() || null,
             auditor_id: document.getElementById('selectAuditor').value || null,
             origen: escaneandoCamara ? 'camara' : 'manual_lector'
@@ -248,7 +327,6 @@
         const { error } = await _sb.from('incidencias_almacen').insert([payload]);
         if (error) return mostrarStatus('Error al guardar incidencia: ' + error.message, 'bad');
 
-        document.getElementById('statUltimo').innerText = payload.codigo;
         document.getElementById('scanInput').value = '';
         document.getElementById('scanInput').focus();
         mostrarPersona('');
@@ -295,6 +373,8 @@
         const emailInput = document.getElementById('histEmail');
         if (emailInput) emailInput.value = '';
         document.getElementById('histPass').value = '';
+        const histFiltro = document.getElementById('histFiltroBodega');
+        if (histFiltro) histFiltro.value = '';
         document.getElementById('tbodyIncidencias').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;">Cargando...</td></tr>';
         const wrap = document.getElementById('ultimasIncidenciasWrap');
         wrap.classList.add('hidden');
@@ -310,8 +390,11 @@
 
     async function cargarIncidencias() {
         if (!historialAutorizado) return;
-        const { data, error } = await _sb.from('incidencias_almacen').select('*, auditores(nombre)').order('fecha', { ascending:false }).limit(50);
         const tbody = document.getElementById('tbodyIncidencias');
+        const filtroBodega = document.getElementById('histFiltroBodega')?.value || '';
+        let q = _sb.from('incidencias_almacen').select('*, auditores(nombre)').order('fecha', { ascending:false }).limit(50);
+        if (filtroBodega) q = q.eq('bodega', filtroBodega);
+        const { data, error } = await q;
         if (error) {
             tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#c0392b;">No se pudo cargar incidencias. Ejecuta el SQL incluido.</td></tr>';
             return;
@@ -443,6 +526,15 @@
         closeUi();
     }
 
+    document.getElementById('modalBuscador').addEventListener('click', e => {
+        if (e.target.id === 'modalBuscador') cerrarBuscadorCodigos();
+    });
+    window.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            cerrarBuscadorCodigos();
+            if (scannerActivo) cerrarScanner();
+        }
+    });
     window.addEventListener('beforeunload', () => cerrarScanner(true));
     init();
 </script>
