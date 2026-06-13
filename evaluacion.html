@@ -246,19 +246,65 @@
         return _mc_norm(last);
     }
 
+    function _mc_escapeRegex(s){
+        return (s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function _mc_hasWholeToken(text, key){
+        const value = _mc_norm(text);
+        const k = _mc_norm(key);
+        if (!value || !k) return false;
+        // Evita que qr=m1 coincida con M12, M10, etc.
+        // Solo acepta el codigo como token completo: "m1", "montacargas m1", "m1 | unidad".
+        const re = new RegExp(`(^|[^a-z0-9])${_mc_escapeRegex(k)}([^a-z0-9]|$)`, 'i');
+        return re.test(value);
+    }
+
+    function _mc_allowLooseMatch(key){
+        const k = _mc_norm(key);
+        // Para codigos cortos terminados en numero (m1, m2, a1, etc.) NO usar coincidencia parcial.
+        // Asi se evita seleccionar m12 cuando el QR trae m1.
+        return k.length >= 4 && !/[0-9]$/.test(k);
+    }
+
     function _mc_matchLocal(key){
         if (!key) return null;
         const tight = key.replace(/\s+/g,'');
-        return (bodegasData || []).find(b => {
+
+        const rows = bodegasData || [];
+
+        // 1) Coincidencia exacta primero.
+        const exact = rows.find(b => {
             const loc = _mc_norm(b.localizacion);
             const nom = _mc_norm(b.nombre);
             const combo = _mc_norm(`${b.localizacion} | ${b.nombre}`);
             const locT = loc.replace(/\s+/g,'');
             const nomT = nom.replace(/\s+/g,'');
+            const comboT = combo.replace(/\s+/g,'');
             return loc === key || nom === key || combo === key
-                || locT === tight || nomT === tight
-                || nom.startsWith(key) || loc.startsWith(key) || combo.includes(key);
-        }) || null;
+                || locT === tight || nomT === tight || comboT === tight;
+        });
+        if (exact) return exact;
+
+        // 2) Coincidencia por token completo. Ejemplo: "Montacargas M1" si qr=m1.
+        const token = rows.find(b =>
+            _mc_hasWholeToken(b.localizacion, key) ||
+            _mc_hasWholeToken(b.nombre, key) ||
+            _mc_hasWholeToken(`${b.localizacion} | ${b.nombre}`, key)
+        );
+        if (token) return token;
+
+        // 3) Coincidencia amplia solo para textos largos, no para codigos tipo m1.
+        if (_mc_allowLooseMatch(key)) {
+            return rows.find(b => {
+                const loc = _mc_norm(b.localizacion);
+                const nom = _mc_norm(b.nombre);
+                const combo = _mc_norm(`${b.localizacion} | ${b.nombre}`);
+                return nom.startsWith(key) || loc.startsWith(key) || combo.includes(key);
+            }) || null;
+        }
+
+        return null;
     }
 
     async function _mc_selectUnidadFromURL(){
@@ -283,8 +329,8 @@
                     .or(`nombre.ilike.%${key}%,localizacion.ilike.%${key}%`)
                     .limit(10);
                 if (data && data.length) {
-                    selected = data.find(b => _mc_norm(b.nombre) === key || _mc_norm(b.localizacion) === key) || data[0];
                     bodegasData = (bodegasData || []).concat(data.filter(x => !(bodegasData || []).some(b => b.id === x.id)));
+                    selected = _mc_matchLocal(key);
                 }
             }
         }
