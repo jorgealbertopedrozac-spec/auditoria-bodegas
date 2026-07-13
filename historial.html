@@ -55,6 +55,17 @@
         th { background: #f8f9fa; padding: 15px; text-align: left; font-size: 0.75em; color: #7f8c8d; text-transform: uppercase; border-bottom: 2px solid #eee; }
         td { padding: 15px; border-bottom: 1px solid #eee; font-size: 0.9em; cursor: pointer; }
         tr:hover { background: #f1f8ff; }
+        .btn-cambiar-bodega { border: none; background: #fff3cd; color: #7a5a00; padding: 7px 10px; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+        .btn-cambiar-bodega:hover { filter: brightness(0.96); }
+        .change-box { max-width: 520px; margin-top: 7vh; }
+        .change-box label { display:block; margin: 14px 0 5px; font-size: .82em; font-weight: bold; color:#555; }
+        .change-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; }
+        .btn-secondary, .btn-save { border:0; border-radius:9px; padding:10px 16px; font-weight:bold; cursor:pointer; }
+        .btn-secondary { background:#eceff1; color:#455a64; }
+        .btn-save { background:var(--success); color:white; }
+        .btn-save:disabled { opacity:.55; cursor:not-allowed; }
+        .change-help { background:#f5f7fa; border-left:4px solid var(--accent); padding:10px; border-radius:7px; font-size:.82em; color:#555; }
+        .change-error { display:none; margin-top:10px; padding:9px; border-radius:7px; background:#fdeaea; color:var(--danger); font-weight:bold; font-size:.85em; }
 
         /* Modales */
         .modal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); }
@@ -121,7 +132,7 @@
     <div class="table-container">
         <table>
             <thead><tr><th>Fecha</th><th>Auditor</th>
-                    <th>Operador</th><th>Ubicación/Ruta</th><th>Resultado</th></tr></thead>
+                    <th>Operador</th><th>Ubicación/Ruta</th><th>Resultado</th><th>Acción</th></tr></thead>
             <tbody id="lista-evaluaciones"></tbody>
         </table>
     </div>
@@ -133,6 +144,26 @@
         <h3 id="modal-titulo" style="margin-top:0; color: var(--primary);">Detalle de Evaluación</h3>
         <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
         <div id="modal-body"></div>
+    </div>
+</div>
+
+
+<div id="modalCambiarBodega" class="modal">
+    <div class="modal-content change-box">
+        <button class="close-modal" onclick="cerrarCambioBodega()">[ CERRAR ]</button>
+        <h3 style="margin-top:0; color:var(--primary);">Cambiar Ubicación/Ruta</h3>
+        <div class="change-help">El cambio se aplicará a esta auditoría y actualizará automáticamente el historial y las métricas. Para guardarlo debes confirmar la contraseña con la que ingresas a Configuración.</div>
+        <label>Auditoría seleccionada</label>
+        <div id="cambio-evaluacion-info" style="font-weight:bold;"></div>
+        <label for="cambio-bodega">Nueva Ubicación/Ruta</label>
+        <select id="cambio-bodega"></select>
+        <label for="cambio-password">Contraseña de Configuración</label>
+        <input type="password" id="cambio-password" autocomplete="current-password" placeholder="Captura tu contraseña" onkeyup="if(event.key==='Enter') guardarCambioBodega()">
+        <div id="cambio-error" class="change-error"></div>
+        <div class="change-actions">
+            <button class="btn-secondary" onclick="cerrarCambioBodega()">Cancelar</button>
+            <button id="btn-guardar-cambio" class="btn-save" onclick="guardarCambioBodega()">Guardar cambio</button>
+        </div>
     </div>
 </div>
 
@@ -149,6 +180,7 @@
     // Cache del último resultado (para exportar CSV)
     let lastEvaluaciones = [];
     let bodegasData = [];
+    let evaluacionCambioId = null;
 
     // Variables de control de Zoom
     let scale = 1, pointX = 0, pointY = 0, isPanning = false, start = { x: 0, y: 0 };
@@ -315,7 +347,7 @@
 
     async function renderDashboard(data) {
         if(!data || data.length === 0) {
-            document.getElementById('lista-evaluaciones').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#999;">No hay auditorías registradas.</td></tr>';
+            document.getElementById('lista-evaluaciones').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#999;">No hay auditorías registradas.</td></tr>';
             document.getElementById('main-score').innerText = "0%";
             document.getElementById('res-pre').innerHTML = "";
             return;
@@ -326,12 +358,13 @@
         document.getElementById('main-score').style.color = avg >= 90 ? 'var(--success)' : (avg >= 80 ? 'var(--warning)' : 'var(--danger)');
 
         document.getElementById('lista-evaluaciones').innerHTML = data.map(ev => `
-            <tr onclick="verDetalle('${ev.id}', '${ev.bodegas.nombre}')">
+            <tr onclick="verDetalle('${ev.id}', decodeURIComponent('${encodeURIComponent(ev.bodegas?.nombre || 'N/A')}'))">
                 <td>${new Date(ev.fecha).toLocaleDateString()}</td>
                 <td>${ev.auditores?.nombre || 'N/A'}</td>
                 <td>${ev.operador || '-'}</td>
-                <td>${ev.bodegas.nombre}</td>
+                <td>${ev.bodegas?.nombre || 'N/A'}</td>
                 <td style="font-weight:bold; color:${ev.calificacion_final>=90?'var(--success)':'var(--danger)'}">${ev.calificacion_final}%</td>
+                <td><button class="btn-cambiar-bodega" onclick="event.stopPropagation(); abrirCambioBodega('${ev.id}')">✏️ Cambiar</button></td>
             </tr>`).join('');
 
         const ids = data.map(x => x.id);
@@ -357,6 +390,81 @@
                 </div>
             </div>`;
         }).join('');
+    }
+
+    function mostrarErrorCambio(mensaje) {
+        const el = document.getElementById('cambio-error');
+        el.innerText = mensaje || 'No se pudo guardar el cambio.';
+        el.style.display = 'block';
+    }
+
+    async function abrirCambioBodega(id) {
+        const ev = (lastEvaluaciones || []).find(x => String(x.id) === String(id));
+        if (!ev) return;
+
+        const { data: authData } = await _supabase.auth.getSession();
+        if (!authData?.session?.user?.email) {
+            alert('Para cambiar la bodega primero debes ingresar a Configuración con tu usuario. Después regresa a Historial y métricas.');
+            return;
+        }
+
+        evaluacionCambioId = id;
+        document.getElementById('cambio-evaluacion-info').innerText = `${new Date(ev.fecha).toLocaleDateString()} · ${ev.auditores?.nombre || 'N/A'} · Actual: ${ev.bodegas?.nombre || 'N/A'}`;
+        document.getElementById('cambio-bodega').innerHTML = bodegasData
+            .map(b => `<option value="${b.id}" ${String(b.id) === String(ev.bodega_id) ? 'selected' : ''}>${b.nombre}${b.localizacion ? ' · ' + b.localizacion : ''}</option>`)
+            .join('');
+        document.getElementById('cambio-password').value = '';
+        document.getElementById('cambio-error').style.display = 'none';
+        document.getElementById('modalCambiarBodega').style.display = 'block';
+        setTimeout(() => document.getElementById('cambio-bodega').focus(), 50);
+    }
+
+    function cerrarCambioBodega() {
+        evaluacionCambioId = null;
+        document.getElementById('modalCambiarBodega').style.display = 'none';
+        document.getElementById('cambio-password').value = '';
+        document.getElementById('cambio-error').style.display = 'none';
+    }
+
+    async function guardarCambioBodega() {
+        if (!evaluacionCambioId) return;
+        const nuevaBodegaId = document.getElementById('cambio-bodega').value;
+        const password = document.getElementById('cambio-password').value;
+        const btn = document.getElementById('btn-guardar-cambio');
+        const ev = (lastEvaluaciones || []).find(x => String(x.id) === String(evaluacionCambioId));
+
+        document.getElementById('cambio-error').style.display = 'none';
+        if (!nuevaBodegaId) return mostrarErrorCambio('Selecciona la nueva Ubicación/Ruta.');
+        if (ev && String(ev.bodega_id) === String(nuevaBodegaId)) return mostrarErrorCambio('Selecciona una bodega diferente a la actual.');
+        if (!password) return mostrarErrorCambio('Captura tu contraseña de Configuración.');
+
+        btn.disabled = true;
+        btn.innerText = 'Validando...';
+        try {
+            const { data: authData } = await _supabase.auth.getSession();
+            const email = authData?.session?.user?.email;
+            if (!email) throw new Error('Tu sesión de Configuración ya no está activa. Ingresa nuevamente a Configuración.');
+
+            const { error: authError } = await _supabase.auth.signInWithPassword({ email, password });
+            if (authError) throw new Error('La contraseña no es correcta.');
+
+            btn.innerText = 'Guardando...';
+            const { error: updateError } = await _supabase
+                .from('evaluaciones')
+                .update({ bodega_id: nuevaBodegaId })
+                .eq('id', evaluacionCambioId);
+            if (updateError) throw updateError;
+
+            cerrarCambioBodega();
+            await aplicarFiltros();
+            alert('La Ubicación/Ruta se actualizó correctamente.');
+        } catch (error) {
+            console.error(error);
+            mostrarErrorCambio(error?.message || 'No se pudo guardar el cambio.');
+        } finally {
+            btn.disabled = false;
+            btn.innerText = 'Guardar cambio';
+        }
     }
 
     async function verDetalle(id, nombre) {

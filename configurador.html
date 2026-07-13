@@ -341,6 +341,7 @@
             return;
         }
 
+        localStorage.setItem('auditoria_config_email', email);
         await updateAuthUI();
         // Cargar data ya logueado
         await initAfterAuth();
